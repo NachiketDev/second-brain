@@ -1,0 +1,12 @@
+# Functions authenticate themselves (CRON_SECRET, INGEST_SECRET, per-proposal tokens),
+# so Supabase's JWT check is turned off for each of them.
+[functions.ingest]
+verify_jwt = false
+[functions.poll]
+verify_jwt = false
+[functions.agents]
+verify_jwt = false
+[functions.digest]
+verify_jwt = false
+[functions.act]
+verify_jwt = false
