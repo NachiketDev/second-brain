@@ -16,3 +16,11 @@ the repo was published; the live project records them as:
 From 20261103065656 on, each file is the exact statement text of the live migration with the same
 version, with personal identifiers replaced by placeholders (`<your-project-ref>`, `<school-email>`).
 `v1-desk` tags the state before the core model rebuild (17 Nov 2026).
+
+## 17 Nov 2026 rebuild, steps 4 to 8
+- `20261117080000_backfill_and_gsync.sql`: goal write path, one-time helpers (completed_at, clearing suggestions),
+  Google Tasks two-way sync functions (`brain_gtask_seen`, `brain_gtask_queue`, `brain_gtask_pushed`).
+- `core_backfill` (applied live, not in this public repo): the approved one-time data load. It only calls
+  `brain_upsert_goal`, `brain_upsert_pursuit`, `brain_set_commitment`, `brain_backfill_completed_at`,
+  `brain_add_contact` and seeds kv `gtask_title_links`. It holds personal data, so it stays private.
+- `20261117082000_desk_goals.sql`: goal boxes with this week's progress for desk v2.
