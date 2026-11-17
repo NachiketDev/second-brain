@@ -239,7 +239,8 @@ table.t td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-al
     <a href="#today">Today</a><a href="#goals">Goals</a><a href="#work">Workbench</a><a href="#people">People</a><a href="#plan">Planning</a><a href="#mirror">Mirror</a><a href="#trust">Trust</a>
   </nav>
   <span class="spacer"></span>
-  <button class="iconbtn" id="refresh" title="Reload from the brain">Refresh</button>
+  <button class="iconbtn" id="tokenBtn" type="button" hidden>Token</button>
+  <button class="iconbtn" id="refresh" type="button" title="Reload from the brain">Refresh</button>
 </header>
 <main id="main"><div class="notice"><b>Connecting to your brain</b>Loading today from the Second Brain connector.</div></main>
 <footer class="status" id="foot"><span>Waiting for the brain</span></footer>
@@ -285,18 +286,43 @@ const FIX = {
   capability_disabled: 'Connectors are not available in this view. Open the page in claude.ai.',
 };
 function errText(e) {
+  if (e?.code === 'bad_token' || e?.code === 'no_token') return 'The brain did not accept the token. Use Token in the top bar to enter it again.';
+  if (e?.code === 'offline') return 'Could not reach the brain. Check the internet connection; the desk retries every minute.';
   if (e?.code === 'tool_error') return 'The brain answered with an error: ' + String(e.message ?? '').slice(0, 160);
   if (e?.code === 'server_unavailable') return 'The brain did not answer in time. Press Refresh in a moment.';
   return FIX[e?.code] ?? ('Could not reach the brain: ' + String(e?.message ?? e).slice(0, 160));
 }
+// Outside Claude (the page opened as a file or from any web host) it talks to the brain's desk endpoint with
+// the connector token, kept only in this browser.
+const DESK_API = 'https://<your-project-ref>.supabase.co/functions/v1/desk';
+const store = { get: (k) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage off */ } } };
+const cleanToken = (v) => String(v ?? '').trim().replace(/^.*\//, '').replace(/[?#].*$/, '');
+let TOKEN = cleanToken(store.get('brain_token'));
+const OP_FOR = { mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block' };
+async function direct(method, query, body) {
+  if (!TOKEN) throw { code: 'no_token' };
+  let r;
+  try { r = await fetch(DESK_API + (query ? '?' + new URLSearchParams(query) : ''), { method, cache: 'no-store',
+    headers: { 'x-brain-token': TOKEN, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined }); }
+  catch (e) { throw { code: 'offline', message: String(e?.message ?? e) }; }
+  if (r.status === 404) throw { code: 'bad_token' };
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw { code: 'tool_error', message: j?.error ?? ('HTTP ' + r.status) };
+  return j;
+}
 async function view(name, args = {}) {
-  if (!MCP) throw { code: 'not_granted' };
+  if (!MCP) return direct('GET', { view: name, ...Object.fromEntries(Object.entries(args).filter(([, v]) => v != null)) });
   const res = await MCP.callTool(SERVER, 'get_desk', { view: name, ...args }, { cache: false });
   const p = typeof res.payload === 'string' ? JSON.parse(res.payload) : res.payload;
   if (p == null || typeof p !== 'object') throw { code: 'tool_error', message: 'Unexpected reply for ' + name };
   return p;
 }
 async function act(tool, input) {
+  if (!MCP) {
+    const b = { op: OP_FOR[tool], ...input };
+    if (tool === 'mark_commitment') { b.id = input.commitment_id; delete b.commitment_id; }
+    return direct('POST', null, b);
+  }
   const res = await MCP.callTool(SERVER, tool, input, { cache: false });
   return typeof res.payload === 'string' ? (() => { try { return JSON.parse(res.payload); } catch { return res.payload; } })() : res.payload;
 }
@@ -646,10 +672,24 @@ setInterval(() => { if (document.hidden) return; const s = screen(); if (s === '
 setInterval(() => { if (!document.hidden && !['today', 'plan'].includes(screen())) load(screen(), true); }, 300000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(screen(), true); });
 
-(async function boot() {
-  try { MCP = window.claude?.use ? await window.claude.use('mcp') : null; } catch { MCP = null; }
-  if (!MCP) { $('#main').innerHTML = `<div class="notice"><b>Open this page in Claude</b>The desk reads your brain through the Second Brain connector, which is only available when the page is opened in claude.ai.</div>`; return; }
+function setup(msg) {
+  $('#main').innerHTML = `<form class="notice" id="setupForm" style="display:grid;gap:10px">
+    <b>Connect this desk to your brain</b><span>${esc(msg)}</span>
+    <input id="tok" type="password" autocomplete="off" placeholder="Connector token, or the whole connector URL" style="padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)">
+    <div><button class="btn primary" type="submit">Connect</button></div>
+    <span class="muted" style="font-size:12.5px">Kept only in this browser. It is the same token as the Second Brain connector (the part after the last / of its URL).</span></form>`;
+  $('#setupForm').onsubmit = async (e) => { e.preventDefault(); TOKEN = cleanToken($('#tok').value); store.set('brain_token', TOKEN); await start(); };
+}
+async function start() {
+  try { if (!MCP) await direct('GET', { view: 'health' }); }
+  catch (e) { if (e.code === 'bad_token' || e.code === 'no_token') return setup(e.code === 'bad_token' ? 'That token was not accepted. Paste it again.' : 'Paste the brain connector token once. After that the desk loads by itself and refreshes every minute.'); }
   await load();
   if (screen() !== 'today') load('today', true);
+}
+$('#tokenBtn').onclick = () => { store.set('brain_token', ''); TOKEN = ''; setup('Enter the brain connector token.'); };
+(async function boot() {
+  try { MCP = window.claude?.use ? await window.claude.use('mcp') : null; } catch { MCP = null; }
+  if (!MCP) $('#tokenBtn').hidden = false;
+  await start();
 })();
 </script>
