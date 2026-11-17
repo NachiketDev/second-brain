@@ -23,6 +23,14 @@ export function beeText(c: any): string {
   ].filter(Boolean).join('\n\n');
 }
 
+// Bee sends times as epoch milliseconds (or ISO strings); normalise to ISO.
+export function beeTime(t: unknown): string {
+  if (typeof t === 'number') return new Date(t < 1e12 ? t * 1000 : t).toISOString();
+  if (typeof t === 'string' && /^\d+$/.test(t)) return beeTime(Number(t));
+  if (typeof t === 'string' && !Number.isNaN(Date.parse(t))) return new Date(t).toISOString();
+  return new Date().toISOString();
+}
+
 async function pollBee() {
   const token = Deno.env.get('BEE_API_TOKEN');
   if (!token) return { bee: 'skipped (no BEE_API_TOKEN)' };
@@ -31,9 +39,12 @@ async function pollBee() {
   if (!res.ok) throw new Error(`Bee list ${res.status}: ${await res.text()}`);
   const body = await res.json();
   const list = body.conversations ?? body.data ?? body.items ?? (Array.isArray(body) ? body : []);
-  let stored = 0;
+  let stored = 0, classes = 0;
   for (const item of list) {
     if (item.state && !['COMPLETED', 'completed', 'done'].includes(item.state)) continue;   // still recording
+    // Never keep class recordings: skip anything that starts during a class on the calendar.
+    const { data: cls } = await db().rpc('is_class_time', { p_at: beeTime(item.start_time ?? item.created_at) });
+    if (cls) { classes++; continue; }
     const d = await fetch(`${BEE}/v1/conversations/${item.id}`, { headers: h });
     if (!d.ok) continue;
     const full = await d.json();
@@ -42,13 +53,14 @@ async function pollBee() {
     if (!content) continue;
     const r = await ingestOne({
       provider: 'bee', kind: 'conversation', external_id: String(conv.id ?? item.id),
-      occurred_at: conv.start_time ?? conv.created_at ?? item.start_time ?? new Date().toISOString(),
+      occurred_at: beeTime(conv.start_time ?? conv.created_at ?? item.start_time),
       title: conv.short_summary?.slice(0, 120) ?? 'Bee conversation', content,
-      payload: { location: conv.primary_location ?? null },
+      payload: { location: conv.primary_location ?? null, bee_start: conv.start_time ?? null,
+        bee_end: conv.end_time ?? null, bee_fields: Object.keys(conv).slice(0, 40) },
     });
     if (r.result === 'stored' || r.result === 'revision') stored++;
   }
-  return { bee: `${list.length} seen, ${stored} new` };
+  return { bee: `${list.length} seen, ${stored} new, ${classes} class recordings skipped` };
 }
 
 // ── Minimal iCal parser (Google's secret iCal feed). Recurring masters are expanded only for simple

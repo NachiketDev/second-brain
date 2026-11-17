@@ -2,7 +2,7 @@
 
 This is the exact prompt of the scheduled task "Second brain: compile and brief"
 (trig_0157vEnMnkYbt8ddSxxqidNi), which runs at 6:47am, 12:47pm, 5:47pm and 10:47pm New York time.
-Keep this file and the task prompt in sync.
+Keep this file and the task prompt in sync. Last changed 16 Nov 2026: sensitive data rule.
 
 ---
 
@@ -18,12 +18,12 @@ STEP 1. Pull new Granola notes into raw memory
    update kv set value = to_jsonb('<timestamp>'::text), updated_at = now() where key = 'granola_cursor';
 
 STEP 1b. Pull forwarded school email into raw memory
-the user's school Outlook (you@school.edu) auto-forwards everything to his Gmail.
+The user's school Outlook (<school-email>) auto-forwards everything to his Gmail.
 1. select value #>> '{}' as cursor from kv where key = 'hbs_email_cursor';   (Unix seconds)
 2. With the Gmail connector, search_threads with query:
-   (to:you@school.edu OR cc:you@school.edu OR from:you@school.edu) -from:you@gmail.com after:<cursor>
+   (to:<school-email> OR cc:<school-email> OR from:<school-email>) -from:<personal-email> after:<cursor>
    Page through results. Read candidates with get_thread (messageFormat PLAIN_TEXT). If a message is an Outlook "FW:" wrapper, the real sender, date and body are in the forwarded header block inside the body; use those.
-3. Triage each message. SKIP (do not ingest): newsletters, marketing, mass event promotions and digests, club/listserv blasts, automated system notices (LMS, career portal, IT), receipts, security codes, calendar auto-notifications that only restate an event. KEEP: email written to the user personally or to a small group he is in (recruiters, professors, classmates, section-mates, staff), anything asking him to act or reply with a deadline, interview or coffee-chat scheduling, offers and recruiting status updates, and threads he has replied in. When unsure, keep it if a person wrote it to him. Ingest at most 20 messages per run, newest last.
+3. Triage each message. SKIP (do not ingest): newsletters, marketing, mass event promotions and digests, club/listserv blasts, automated system notices (Canvas, 12twenty, myHBS, IT), receipts, security codes, calendar auto-notifications that only restate an event. KEEP: email written to the user personally or to a small group he is in (recruiters, professors, classmates, section-mates, staff), anything asking him to act or reply with a deadline, interview or coffee-chat scheduling, offers and recruiting status updates, and threads he has replied in. When unsure, keep it if a person wrote it to him. Ingest at most 20 messages per run, newest last.
 4. For each kept message:
    select ingest_raw('hbs_email', '<gmail message id>', '<sent date ISO>', '<subject>', '<content>', '<message viewUrl>', 'email', jsonb_build_object('thread_id', '<thread id>', 'from', '<sender email>'));
    content = "From: <name, email>\nTo: <...>\nCc: <...>\n\n<plain body>" with quoted earlier replies, signatures, safelink URLs and legal footers removed, max 6000 characters. Double every single quote.
@@ -56,7 +56,9 @@ Return one JSON object with keys entities, claims, commitments, commitment_updat
 - Stories {id, title (new only), note, importance (new only)}: update existing story ids first; note = one line on what this event added.
 - Edges {src, rel, dst}: coffee_chat, works_at, discussed, coaches, can_intro, introduced, office_of, teammate_on, shared_interest, emailed.
 - If context.event.is_revision_of is set, emit only what changed.
-- Privacy: light rapport details are fine; never store anyone's health, immigration status, finances, family matters, grades or similar. If consent_scope is 'restricted', return only entities, edges, commitments and at most one claim about "me".
+- Check-ins and corrections (provider 'checkin' or 'correction') are the user speaking directly: his statements about himself are class declared, and a correction overrides what the brain had (reuse the same predicate so it supersedes, with change_reason "corrected by the user", or use commitment_updates). Never turn a check-in into hypotheses about him.
+- Hypotheses: for meetings and emails you may add up to 2 claims with class inferred and kind hypothesis when the source clearly suggests something about his priorities, interests, plans or relationships that he has not stated (e.g. "seems to be prioritising BCG over McKinsey"). Confidence 0.5-0.7, evidence = what suggested it. They are asked in his morning check-in and only become facts if he confirms. Never psychological or personality interpretations.
+- Sensitive data (rule changed 16 Nov 2026 by the user): store what the sources contain, including health, finances, immigration, family matters, grades and details about other people. the user captures with consent and does the filtering himself. Nothing from memory is ever sent to anyone automatically. If consent_scope is 'restricted' (for example an NDA engagement), return only entities, edges, commitments and at most one claim about "me".
 
 BRIEFING RULES
 Use only the records returned. Under 200 words, plain markdown, no em dashes: Who (one line per person: role, firm, how he knows them, when they last spoke); Last time (topics plus rapport details); Open loops (either side, with dates); Use this meeting to (2-3 specific goals grounded in his priorities). Cite dates. Never invent; if nothing is known about someone, say so in one line.

@@ -1,7 +1,10 @@
 // ACT: the only place anything leaves the brain, and only after you approve.
-// Links in the digest look like /act?id=12&t=<token>&do=approve. Email scanners pre-open links, so
-// every action needs a second click on a confirm link before it runs.
-import { db, handler } from '../_shared/lib.ts';
+// Two entry points:
+//  1. Digest links: /act?id=12&t=<token>&do=approve. Email scanners pre-open links, so every action
+//     needs a second click on a confirm link before it runs.
+//  2. Queue mode (POST, cron secret, no id): runs tasks you approved in the review page
+//     (decide_proposal sets them 'queued' and calls brain_call('act')).
+import { db, handler, requireCron } from '../_shared/lib.ts';
 import { addGoogleTask, gConfigured } from '../_shared/gtasks.ts';
 
 const text = (body: string, status = 200) =>
@@ -20,8 +23,37 @@ async function todoist(payload: Record<string, string | null>) {
   return await res.json();
 }
 
+// deno-lint-ignore no-explicit-any
+async function addTask(payload: any) {
+  return gConfigured() ? await addGoogleTask(payload) : await todoist(payload);
+}
+
+async function runQueued() {
+  const sb = db();
+  const where = gConfigured() ? 'Google Tasks' : 'Todoist';
+  const { data: rows } = await sb.from('proposals').select('*').eq('status', 'queued').eq('kind', 'task').limit(25);
+  const out = { added: 0, failed: 0 };
+  for (const p of rows ?? []) {
+    // claim the row first so two overlapping runs never add the same task twice
+    const { data: claimed } = await sb.from('proposals').update({ status: 'approved' })
+      .eq('id', p.id).eq('status', 'queued').select('id');
+    if (!claimed?.length) continue;
+    try {
+      const task = await addTask(p.payload);
+      await sb.from('proposals').update({ status: 'executed', result: { app: where, task_id: task?.id ?? null } }).eq('id', p.id);
+      out.added++;
+    } catch (e) {
+      await sb.from('proposals').update({ status: 'failed', result: { error: String((e as Error).message ?? e) } }).eq('id', p.id);
+      out.failed++;
+    }
+  }
+  return out;
+}
+
 Deno.serve(handler(async (req) => {
   const u = new URL(req.url);
+  if (req.method === 'POST' && !u.searchParams.get('id')) { await requireCron(req); return await runQueued(); }
+
   const id = u.searchParams.get('id'), t = u.searchParams.get('t'), action = u.searchParams.get('do') ?? 'approve';
   const sb = db();
   const { data: p } = await sb.from('proposals').select('*').eq('id', id).eq('token', t).maybeSingle();
@@ -54,7 +86,7 @@ Deno.serve(handler(async (req) => {
   if (p.kind === 'task') {
     const where = gConfigured() ? 'Google Tasks' : 'Todoist';
     try {
-      const task = gConfigured() ? await addGoogleTask(p.payload) : await todoist(p.payload);
+      const task = await addTask(p.payload);
       await finish('executed', { app: where, task_id: task?.id ?? null });
       return text(`Added to ${where}: ${p.title}${p.payload.due_date ? ` (due ${p.payload.due_date})` : ''}`);
     } catch (e) {
@@ -73,4 +105,3 @@ Deno.serve(handler(async (req) => {
   await finish('approved');
   return text(`Noted: ${p.title}`);
 }));
-

@@ -57,6 +57,22 @@ export async function gEnsureList(token: string) {
   return list.id as string;
 }
 
+/** Open tasks across all of the user's Google Tasks lists (read-only). */
+export async function listGoogleTasks(includeCompleted = false) {
+  const token = await accessToken();
+  const lists = await api(token, '/users/@me/lists?maxResults=100');
+  const out: { list: string; title: string; due: string | null; notes: string | null; status: string }[] = [];
+  for (const l of lists.items ?? []) {
+    const q = new URLSearchParams({ maxResults: '100', showCompleted: String(includeCompleted), showHidden: String(includeCompleted) });
+    const t = await api(token, `/lists/${l.id}/tasks?${q}`);
+    for (const x of t.items ?? []) {
+      if (!x.title) continue;
+      out.push({ list: l.title, title: x.title, due: x.due ? x.due.slice(0, 10) : null, notes: x.notes ?? null, status: x.status });
+    }
+  }
+  return out.sort((a, b) => (a.due ?? '9999').localeCompare(b.due ?? '9999'));
+}
+
 export async function addGoogleTask(p: { content: string; description?: string | null; due_date?: string | null }) {
   const token = await accessToken();
   const listId = await gEnsureList(token);
