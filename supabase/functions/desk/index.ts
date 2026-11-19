@@ -2,7 +2,7 @@
 // Auth: brain_mcp_secret, sent in the x-brain-token header or as the last path segment. Wrong token = 404.
 // v1: GET returns the brain_desk bundle; POST {action:'done'|'dropped'|'open', id} marks one of HIS commitments.
 // v2: GET ?view=control|goals|workbench|people|person|week|review|trust|health (+ org, id, week_start, month)
-//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (all through brain_* functions).
+//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (mark, set_priorities, update_pursuit, plan_block, delete_block, update_task) (all through brain_* functions).
 // Nothing is ever sent to anyone from here; Google Tasks gets a copy of his own task changes.
 import { checkSecret, db } from '../_shared/lib.ts';
 import { gConfigured, pushGoogleTasks } from '../_shared/gtasks.ts';
@@ -49,6 +49,14 @@ const OPS: Record<string, (b: any) => Promise<unknown>> = {
   plan_block: (b) => rpc('brain_plan_block', { p_starts: b.start, p_ends: b.end, p_commitment_id: b.commitment_id ?? null,
     p_pursuit_id: b.pursuit_id ?? null, p_goal_id: b.goal_id ?? null, p_title: b.title ?? null, p_kind: b.kind ?? 'planned' }),
   delete_block: (b) => rpc('brain_delete_block', { p_id: Number(b.id) }),
+  update_task: async (b) => {
+    const f: Record<string, unknown> = {};
+    for (const [k, col] of [['pursuit_id', 'pursuit_id'], ['goal_id', 'goal_id'], ['due_date', 'due_at'], ['estimate_min', 'estimate_min'], ['title', 'action']])
+      if (b[k] !== undefined) f[col] = b[k];
+    const id = Number(b.commitment_id ?? b.id);
+    const r = await rpc('brain_set_commitment', { p_id: id, p_fields: f });
+    return { ...r, google: await syncGoogle(id) };
+  },
 };
 
 Deno.serve(async (req) => {
@@ -81,8 +89,8 @@ Deno.serve(async (req) => {
       if (b.op) {
         const op = OPS[b.op];
         if (!op) return json({ error: 'unknown op' }, 400);
-        if (b.op === 'mark') {
-          const { data: row } = await sb.from('commitments').select('owner').eq('id', b.id).maybeSingle();
+        if (b.op === 'mark' || b.op === 'update_task') {
+          const { data: row } = await sb.from('commitments').select('owner').eq('id', Number(b.id ?? b.commitment_id)).maybeSingle();
           if (!row || row.owner !== 'me') return json({ error: 'only your own commitments can be changed here' }, 403);
         }
         return json(await op(b));

@@ -100,6 +100,9 @@ footer.status .dot.warn { background: var(--warn); } footer.status .dot.bad { ba
 .pill.over { background: var(--bad-soft); color: var(--bad); }
 .pill.review { background: var(--warn-soft); color: var(--warn); }
 .pill.soon { background: var(--accent-soft); color: var(--accent); }
+.est { border: 1px solid var(--line); background: transparent; border-radius: 99px; font: 11.5px var(--f-mono); padding: 0 7px; color: var(--ink-2); }
+.est.guess { border-style: dashed; color: var(--ink-3); }
+.est:hover { border-color: var(--accent); color: var(--accent); }
 .star { border: 0; background: transparent; color: var(--ink-3); padding: 0 2px; font-size: 15px; line-height: 1; }
 .star:hover, .star.on { color: var(--accent); }
 .owed .row { padding: 6px 0; border-top: 1px solid var(--line); }
@@ -273,6 +276,7 @@ function nyIso(dateStr, minutes) { // wall time in New York -> ISO with the righ
   const off = (t) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(t)).map(x => [x.type, x.value])); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - t; };
   let t = guess - off(guess); t = guess - off(t); return new Date(t).toISOString();
 }
+const fmtMin = (m) => m >= 60 ? (m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`) : `${m}m`;
 const CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="var(--panel)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 // ── Connector ───────────────────────────────────────────────────────────────────────────────────────
@@ -298,7 +302,7 @@ const DESK_API = 'https://<your-project-ref>.supabase.co/functions/v1/desk';
 const store = { get: (k) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage off */ } } };
 const cleanToken = (v) => String(v ?? '').trim().replace(/^.*\//, '').replace(/[?#].*$/, '');
 let TOKEN = cleanToken(store.get('brain_token'));
-const OP_FOR = { mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block' };
+const OP_FOR = { update_task: 'update_task', mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block' };
 async function direct(method, query, body) {
   if (!TOKEN) throw { code: 'no_token' };
   let r;
@@ -352,7 +356,7 @@ async function load(which = screen(), quiet = false) {
     if (which === 'plan') S.week = await view('week', S.weekStart ? { week_start: S.weekStart } : {});
     if (which === 'mirror') S.review = await view('review');
     if (which === 'trust') S.trust = await view('trust');
-    if (!S.control && which !== 'today') S.control = await view('control');
+    if (which !== 'today') S.control = await view('control');   // header date and footer mode stay current on every screen
     S.err[which] = null; S.updated = new Date();
   } catch (e) { S.err[which] = e; if (!quiet) console.warn(e); }
   render();
@@ -366,13 +370,14 @@ function pillsFor(c) {
   if (c.status === 'needs_review') out.push('<span class="pill review">check: a fact changed</span>');
   if (c.status === 'unknown') out.push('<span class="pill review">still on?</span>');
   if (c.for_name) out.push(`<span>for ${esc(c.for_name)}</span>`);
+  if (c.is_event) out.push('<span class="pill">event</span>');
   return out.join('');
 }
 function taskRow(c, big3ids) {
   const done = c.status === 'done';
   return `<div class="task ${done ? 'done' : ''}" data-id="${c.id}">
     <button class="tick" type="button" data-tick="${c.id}" aria-label="${done ? 'Reopen' : 'Mark done'}: ${esc(c.action)}">${CHECK}</button>
-    <div class="txt">${esc(c.action)}<div class="meta">${pillsFor(c)}</div></div>
+    <div class="txt">${esc(c.action)}<div class="meta">${pillsFor(c)}${c.estimate_min != null && !done ? `<button class="est ${c.estimate_source === 'default' ? 'guess' : ''}" type="button" data-est="${c.id}" data-pop="1" title="${c.estimate_source === 'default' ? 'Default estimate, click to set' : 'Estimate (' + esc(c.estimate_source ?? '') + '), click to change'}">${fmtMin(c.estimate_min)}</button>` : ''}</div></div>
     <button class="star ${big3ids.includes(c.id) ? 'on' : ''}" type="button" data-star="${c.id}" title="${big3ids.includes(c.id) ? 'Remove from Big 3' : 'Add to Big 3'}" aria-label="Big 3">${big3ids.includes(c.id) ? '★' : '☆'}</button>
   </div>`;
 }
@@ -439,7 +444,7 @@ function renderGoals() {
       <h3><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.title)}</h3>
       <div class="tracker">Tracker: ${esc(b.tracker ?? 'not set')}</div>
       <div class="kpis"><div><b>${b.done_week}</b>done this week</div><div><b>${b.open}</b>open</div><div><b>${b.hours_week}</b>hours planned</div></div>
-      ${b.targets.map(t => `<div class="target">${esc(t.action)}: <span class="num">${t.done}/${t.target}</span> ${esc(t.unit ?? '')}<div class="meter"><i style="width:${Math.min(100, Math.round(100 * t.done / t.target))}%;background:${boxColor(b.box)}"></i></div></div>`).join('')}
+      ${b.targets.map(t => `<div class="target">${esc(t.action)}: <span class="num">${t.done}/${t.target}</span> ${esc(t.unit ?? '')}${(t.days ?? []).length ? `<div class="muted" style="font-size:12px">${t.days.map(d => esc(shortDate(d.day)) + ': ' + d.sessions + (d.source === 'reported' ? ' (you said)' : ' (calendar)')).join(' · ')}</div>` : '<div class="muted" style="font-size:12px">Counts finished cases: past case-prep events on the calendar, or a number you give in a check-in.</div>'}<div class="meter"><i style="width:${Math.min(100, Math.round(100 * t.done / t.target))}%;background:${boxColor(b.box)}"></i></div></div>`).join('')}
       <ol>${b.actions.map(a => `<li>${esc(a.title)}</li>`).join('')}</ol></section>`).join('')}</div>
     <p class="muted" style="margin-top:14px">Only boxes with a weekly target can be on track or behind. Set a target in a check-in ("gym 3 a week").</p>`;
 }
@@ -453,7 +458,7 @@ function renderWork() {
   const row = (p, child) => `<div class="prow ${child ? 'child' : ''}">
     <div class="ttl"><span class="swatch" style="background:${boxColor(boxKey(p.goal_id))}"></span>${esc(p.title)}
       ${p.deadline ? `<span class="pill soon">deadline ${esc(shortDate(p.deadline))}</span>` : ''}
-      ${p.people.length ? `<button class="linkbtn" type="button" data-org-of="${esc(p.id)}">${p.people.length} people</button>` : ''}
+      ${p.people.length ? `<button class="linkbtn" type="button" data-org-of="${esc(p.id)}">${p.people.length} ${p.people.length === 1 ? 'person' : 'people'}</button>` : ''}
       ${p.ask_close ? '<span class="pill review">quiet 14+ days: close it?</span>' : ''}</div>
     <div>${p.kind === 'firm' ? `<select class="stage" data-stage="${esc(p.id)}" aria-label="Stage for ${esc(p.title)}">${STAGES.map(s => `<option ${s === p.stage ? 'selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="pill">${esc(p.kind)}</span>`}</div>
     <div class="sub">${p.summary ? esc(p.summary) : '<span class="muted">No summary yet. The next compile run writes one.</span>'} <span class="muted">· last activity ${ago(p.last_activity)}${p.open_moves ? ' · ' + p.open_moves + ' open' : ''}</span></div>
@@ -477,7 +482,7 @@ function renderWork() {
 // ── People ─────────────────────────────────────────────────────────────────────────────────────────
 function renderPeople() {
   const sky = S.sky; if (!sky) return S.err.people ? notice(S.err.people) : loading();
-  const orgs = sky.orgs.map(o => `<button class="orgrow" type="button" data-org="${esc(o.id)}" aria-pressed="${o.id === S.orgId}"><span>${esc(o.name)}</span><span class="n">${o.people}${o.active_30d ? ' · ' + o.active_30d + ' recent' : ''}</span></button>`).join('');
+  const orgs = sky.orgs.map(o => `<button class="orgrow" type="button" data-org="${esc(o.id)}" aria-pressed="${o.id === S.orgId}"><span>${esc(o.name)}</span><span class="n">${o.people} ${o.people === 1 ? 'person' : 'people'}${o.last ? ' · ' + esc(shortDate(o.last)) : ''}</span></button>`).join('');
   let mid = '<div class="empty">Pick an organisation to see its people and how they connect.</div>';
   if (S.org && S.org.org) {
     const ppl = S.org.people;
@@ -534,7 +539,7 @@ function renderPlan() {
   const heads = days.map(d => `<div class="dh ${d === today ? 'today' : ''}">${new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })} <span class="muted">${shortDate(d)}</span></div>`).join('');
   const hours = [...Array(24)].map((_, h) => `<div>${h === 0 ? '' : String(h).padStart(2, '0') + ':00'}</div>`).join('');
   const u = w.utilization;
-  const backlog = w.backlog.map(c => `<button class="bl" type="button" data-pick="${c.id}" aria-pressed="${S.pick === c.id}"><div>${esc(c.action)}</div><div class="meta">${esc(c.pursuit ?? '')}${c.due ? ' · due ' + esc(shortDate(c.due)) : ''}${c.estimate_min ? ' · ' + c.estimate_min + ' min' : ''}</div></button>`).join('') || '<div class="empty">Everything open is already planned this week.</div>';
+  const backlog = w.backlog.map(c => `<button class="bl" type="button" data-pick="${c.id}" aria-pressed="${S.pick === c.id}"><div>${esc(c.action)}</div><div class="meta">${esc(c.pursuit ?? '')}${c.due ? ' · due ' + esc(shortDate(c.due)) : ''}${c.estimate_min ? ' · ' + fmtMin(c.estimate_min) + (c.estimate_source === 'default' ? ' (default)' : '') : ''}</div></button>`).join('') || '<div class="empty">Everything open is already planned this week.</div>';
   return `<div class="plan">
     <div style="min-width:0">
       <div class="weekhead"><h2>Week of ${esc(shortDate(start))}</h2>
@@ -560,6 +565,7 @@ function renderMirror() {
       return `<section class="panel"><h2><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.box)}<span class="right"><span class="verdict ${t ? 'none' : 'none'}">${t ? 'target ' + t.weekly_target + '/' + 'wk' : 'no target'}</span></span></h2>
         <div class="kpis"><div><b>${b.done}</b>done</div><div><b>${b.open}</b>open</div><div><b>${b.hours}</b>hours</div></div>
         ${t ? `<div class="target">${esc(t.action)}: judged weekly on the Goals screen.</div>` : '<div class="target muted">Activity only. Give it a weekly target to be judged.</div>'}</section>`; }).join('')}</div>
+    ${r.approximate_note ? `<p class="pickhint" style="margin-top:14px">${esc(r.approximate_note)} Late since 17 Nov (exact): ${p.late_exact}.</p>` : ''}
     <p class="muted" style="margin-top:14px">First review call: 5 Dec. The mirror reads only what the brain recorded; time blocks marked actual count as hours.</p>`;
 }
 
@@ -639,6 +645,21 @@ async function planAt(day, y) {
   catch (e) { toast(newToolMissing(e) ? 'Planning here needs the updated connector. Reconnect Second Brain in Settings, Connectors.' : errText(e)); }
   load('plan', true);
 }
+function estPop(el) {
+  closePop(); const id = +el.dataset.est; const c = findTask(id) ?? (S.week?.backlog ?? []).find(x => x.id === id); if (!c) return;
+  const r = el.getBoundingClientRect(); const p = document.createElement('div'); p.className = 'pop';
+  p.style.left = Math.min(window.innerWidth - 310, r.left) + 'px'; p.style.top = Math.min(window.innerHeight - 150, r.bottom + 6) + 'px';
+  p.innerHTML = `<b>How long will it take?</b><div class="muted" style="font-size:12px">${esc(c.action)}</div>
+    <div class="row">${[15, 30, 45, 60, 90, 120].map(m => `<button class="btn" type="button" data-setest="${m}">${fmtMin(m)}</button>`).join('')}</div>
+    <div class="row"><input id="estMin" type="number" min="5" max="600" step="5" value="${c.estimate_min ?? 30}" style="width:80px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg)"> <span class="muted" style="align-self:center">min</span><button class="btn primary" type="button" id="estSave">Save</button></div>`;
+  document.body.appendChild(p);
+  const save = async (m) => { closePop(); if (!(m > 0)) return; c.estimate_min = m; c.estimate_source = 'his'; render();
+    try { await act('update_task', { commitment_id: id, estimate_min: m }); toast('Estimate set to ' + fmtMin(m) + '.'); }
+    catch (e) { toast(newToolMissing(e) ? 'Editing estimates here needs the updated connector. Reconnect Second Brain in Settings, Connectors.' : errText(e)); }
+    load(screen(), true); };
+  p.querySelectorAll('[data-setest]').forEach(b => b.onclick = () => save(+b.dataset.setest));
+  p.querySelector('#estSave').onclick = () => save(Math.round(+p.querySelector('#estMin').value));
+}
 function blockPop(el) {
   closePop(); const id = +el.dataset.block; const b = S.week.blocks.find(x => x.id === id); if (!b) return;
   const r = el.getBoundingClientRect(); const p = document.createElement('div'); p.className = 'pop';
@@ -649,8 +670,9 @@ function blockPop(el) {
   $('#delBlock').onclick = async () => { closePop(); try { await act('delete_block', { id }); toast('Block removed.'); } catch (e) { toast(newToolMissing(e) ? 'Removing blocks here needs the updated connector.' : errText(e)); } load('plan', true); };
 }
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-tick],[data-star],[data-org],[data-org-of],[data-person],[data-pick],[data-week],[data-block],[data-copy],.daycol');
+  const t = e.target.closest('[data-est],[data-tick],[data-star],[data-org],[data-org-of],[data-person],[data-pick],[data-week],[data-block],[data-copy],.daycol');
   if (!t) return;
+  if (t.dataset.est) return estPop(t);
   if (t.dataset.tick) return tick(+t.dataset.tick);
   if (t.dataset.star) return star(+t.dataset.star);
   if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast('Copied.'); } catch { const r = document.createRange(); r.selectNodeContents(t.previousElementSibling); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Press Ctrl+C to copy.'); } return; }
@@ -668,7 +690,7 @@ window.addEventListener('hashchange', () => { closePop(); render(); load(); });
 $('#refresh').onclick = () => load();
 
 // Keep the visible screen fresh: Today every minute, other screens every 5 minutes.
-setInterval(() => { if (document.hidden) return; const s = screen(); if (s === 'today' || s === 'plan') load(s, true); }, 60000);
+setInterval(() => { if (document.hidden) return; const s = screen(); if (s === 'today' || s === 'plan') load(s, true); else view('control').then(c => { S.control = c; footer(); render(); }).catch(() => {}); }, 60000);
 setInterval(() => { if (!document.hidden && !['today', 'plan'].includes(screen())) load(screen(), true); }, 300000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(screen(), true); });
 

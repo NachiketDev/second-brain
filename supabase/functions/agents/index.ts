@@ -1,8 +1,9 @@
 // AGENTS (cron hourly): read the brain + what changed, and write PROPOSALS. Suggest-only: nothing here
 // touches Todoist, your calendar or email. You approve from the daily digest; `act` executes.
 //
-//  todo      new commitment you own            -> "Add to Todoist?"
-//  deadline  your commitment due within 3 days -> "Block prep time?" (Google Calendar link)
+//  (todo: retired 18 Nov. His own tasks go straight to his lists and Google Tasks, no approval step)
+//  deadline  your task due within 3 days       -> "Block prep time?" (Google Calendar link); never for
+//            a task that is attending an event (is_event), which has its own time already
 //  followup  someone owes you, 5+ days quiet   -> drafted nudge
 //  review    a commitment's premise changed    -> "Keep or drop?" with the reason
 //  (meeting briefings are written by the scheduled Claude task via briefing_candidates())
@@ -36,6 +37,8 @@ async function propose(sb: ReturnType<typeof db>, items: Proposal[]) {
 
 async function commitmentAgents(sb: ReturnType<typeof db>, names: Map<string, string>) {
   const { data: loops } = await sb.from('open_loops').select('*');
+  const { data: evs } = await sb.from('commitments').select('id').eq('is_event', true).in('status', ['open', 'needs_review']);
+  const isEvent = new Set((evs ?? []).map((r: Row) => r.id));
   const out: Proposal[] = [];
   const now = Date.now();
   for (const c of loops ?? []) {
@@ -50,12 +53,7 @@ async function commitmentAgents(sb: ReturnType<typeof db>, names: Map<string, st
       continue;
     }
     if (c.owner === 'me') {
-      out.push({ agent: 'todo', kind: 'task', priority: c.due_at ? 2 : 3, dedupe_key: `task:${c.id}`,
-        title: c.action,
-        body: `From ${src}. "${c.evidence}"`,
-        payload: { content: c.action, due_date: c.due_at, description: `From ${src}\n${c.evidence}` },
-        related: { commitment_id: c.id } });
-      if (c.due_at) {
+      if (c.due_at && !isEvent.has(c.id)) {
         const left = (new Date(`${c.due_at}T23:59:00`).getTime() - now) / day;
         if (left <= 3 && left > -1) {
           out.push({ agent: 'deadline', kind: 'calendar', priority: 1, dedupe_key: `deadline:${c.id}:${c.due_at}`,
