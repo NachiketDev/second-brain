@@ -1,8 +1,9 @@
-// GAUTH: one-time Google sign-in for Google Tasks.
+// GAUTH: one-time Google sign-in for Google Tasks and the Brain calendar (planned time blocks).
 //  ?start=<state>  -> redirects to Google (state is a one-time value created in the database)
 //  ?code&state     -> Google sends you back here; the refresh token is stored in Vault
 import { db, handler } from '../_shared/lib.ts';
 import { G_AUTH, G_SCOPE, gClientId, gEnsureList, gRedirect, gToken } from '../_shared/gtasks.ts';
+import { GCAL_SCOPE, gEnsureCalendar } from '../_shared/gcal.ts';
 
 const text = (body: string, status = 200) =>
   new Response(body, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } });
@@ -20,7 +21,7 @@ Deno.serve(handler(async (req) => {
   if (start) {
     if (!valid(start)) return text('This sign-in link has expired. Ask Claude for a new one.', 403);
     const p = new URLSearchParams({ client_id: await gClientId(), redirect_uri: gRedirect(), response_type: 'code',
-      scope: G_SCOPE, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: start });
+      scope: `${G_SCOPE} ${GCAL_SCOPE}`, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state: start });
     return Response.redirect(`${G_AUTH}?${p}`, 302);
   }
 
@@ -30,7 +31,9 @@ Deno.serve(handler(async (req) => {
     const token = await gToken({ grant_type: 'authorization_code', code, redirect_uri: gRedirect() });
     await sb.from('kv').update({ value: { ...row!.value, used: true } }).eq('key', 'g_oauth_state');
     await gEnsureList(token);
-    return text('Connected. Approved tasks from your digest will now go to the "Brain" list in Google Tasks. You can close this tab.');
+    let cal = 'Planned time blocks will appear in a new "Brain" calendar within 15 minutes.';
+    try { await gEnsureCalendar(token); } catch (e) { cal = `Calendar is not ready yet: ${(e as Error).message}.`; }
+    return text(`Connected. Your tasks stay in the "Brain" list in Google Tasks. ${cal} You can close this tab.`);
   }
   return text('Nothing to do here.', 400);
 }));

@@ -3,9 +3,11 @@
 //    Recordings that start during a class on the calendar are never kept.
 //  - Calendar: one or more iCal feeds in CALENDAR_ICS_URL (comma separated) -> calendar_events.
 //  - Google Tasks: two-way sync with the commitments table (push the brain's changes, then pull ticks).
+//  - Google Calendar: planned time blocks pushed to the separate Brain calendar.
 import { db, handler, requireCron } from '../_shared/lib.ts';
 import { ingestOne } from '../_shared/ingest.ts';
 import { gConfigured, pullGoogleTasks, pushGoogleTasks } from '../_shared/gtasks.ts';
+import { pushCalendarBlocks } from '../_shared/gcal.ts';
 
 const BEE = Deno.env.get('BEE_API_BASE') ?? 'https://api.developer.bee.amazon.dev';
 
@@ -216,10 +218,16 @@ async function syncTasks() {
   return { gtasks: { push, pull } };
 }
 
+// Planned time blocks to the Brain calendar (waits quietly until the Google sign-in includes Calendar).
+async function syncBlocks() {
+  if (!gConfigured()) return { gcal: 'not connected' };
+  return { gcal: await pushCalendarBlocks() };
+}
+
 Deno.serve(handler(async (req) => {
   await requireCron(req);
   const out: Record<string, unknown> = {};
-  for (const [name, fn] of [['bee', pollBee], ['calendar', pollCalendar], ['gtasks', syncTasks]] as const) {
+  for (const [name, fn] of [['bee', pollBee], ['calendar', pollCalendar], ['gtasks', syncTasks], ['gcal', syncBlocks]] as const) {
     try { Object.assign(out, await fn()); } catch (e) { out[name] = `error: ${(e as Error).message}`; }
   }
   return out;
