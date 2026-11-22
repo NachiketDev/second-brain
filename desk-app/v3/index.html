@@ -28,6 +28,54 @@
 .dedit textarea { box-sizing: border-box; width: 100%; min-height: 220px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); padding: 12px 14px; font: 15px/1.6 var(--f-body); resize: vertical; }
 .dedit input { border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); padding: 6px 10px; width: min(320px, 100%); }
 .dedit .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+
+/* Mirror: a monthly review that reads like a boss with all the data. One verdict per box, evidence under it,
+   his own words quoted back, then the decision for that box. Colour only for verdicts. */
+.verdict.fail { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.mhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.mhead .spacer { flex: 1; }
+.mline { font: 600 21px/1.35 var(--f-head); letter-spacing: -0.01em; max-width: 60ch; text-wrap: balance; margin: 0; }
+.mbx { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 22px; }
+@media (max-width: 900px) { .mbx { grid-template-columns: minmax(0, 1fr); } }
+.mbx .ev { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; color: var(--ink-2); }
+.mbx .ev li::before { content: "·"; color: var(--ink-4); margin-right: 8px; }
+.mbx .qs { margin: 0 0 8px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.mbx textarea, .mform input, .mform select, .mrw input { box-sizing: border-box; width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); padding: 9px 12px; font: 14px/1.5 var(--f-body); }
+.mbx textarea { min-height: 84px; resize: vertical; }
+.mdec { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.mrw { margin-top: 8px; }
+.saved { font-size: 12px; color: var(--good); }
+.mform { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+@media (max-width: 700px) { .mform { grid-template-columns: minmax(0, 1fr); } }
+.mlist .lrow b { font-weight: 500; }
+.mtag { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: 2px 7px; border-radius: 6px; background: var(--sunk); color: var(--ink-3); }
+.mtag.dropped, .mtag.overdue { color: var(--bad); }
+.mtag.late { color: var(--warn); }
+.mclose { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+/* Control room: one band that changes with the time of day, the outbox with what to do about each item,
+   a night clock for the always-on monitor, and a side sheet that answers "why is this here?". */
+.modeband { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-radius: 14px; padding: 12px 18px; background: var(--sunk); }
+.modeband .mk { font-size: 11.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.modeband .mt { font: 600 16px var(--f-head); flex: 1; min-width: 220px; }
+.modeband.done { background: var(--good-soft); }
+.modeband.done .mt { color: var(--good); }
+.modeband.morning { background: var(--accent-soft); }
+.task .why { font: 600 12px var(--f-mono); color: var(--ink-4); }
+.task .why:hover { color: var(--accent); }
+.yes .acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.yes .acts .btn { padding: 4px 10px; font-size: 12.5px; }
+.yes .draft { white-space: pre-wrap; font-size: 12.5px; background: var(--panel); border: 1px solid var(--warn-line); border-radius: 10px; padding: 8px 10px; margin-top: 6px; max-height: 160px; overflow: auto; }
+.nightclock { position: fixed; inset: 0; z-index: 60; background: #05060A; color: #C9CCD6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; border: 0; width: 100%; cursor: pointer; padding: env(safe-area-inset-top, 0px) 16px env(safe-area-inset-bottom, 0px); }
+.nightclock .t { font: 500 clamp(72px, 16vw, 220px)/1 var(--f-mono); letter-spacing: -0.04em; color: #9AA0B0; }
+.nightclock .d { font-size: 18px; color: #6E7383; }
+.nightclock .n { font-size: 15px; color: #8A8FA0; max-width: 60ch; text-align: center; }
+.nightclock .h2 { font-size: 12.5px; color: #4C5060; margin-top: 18px; }
+.whysheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(460px, 100%); z-index: 50; background: var(--bg); border-left: 1px solid var(--line); box-shadow: -12px 0 40px rgba(0,0,0,.18); overflow: auto; padding: calc(20px + env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-right, 0px)) 24px 22px; display: flex; flex-direction: column; gap: 14px; }
+.whysheet .x { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px; }
+.whysheet .lbl { font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 4px; }
+.whysheet .src { white-space: pre-wrap; font-size: 13px; line-height: 1.55; background: var(--sunk); border-radius: 10px; padding: 10px 12px; max-height: 320px; overflow: auto; }
+.whysheet .hist div { font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line2); }
 </style>
 <title>Brain Desk</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -377,7 +425,7 @@ table.t td { padding: 7px 8px; border-bottom: 1px solid var(--line2); vertical-a
 <header class="bar">
   <div class="brand"><b>Desk</b><span class="day" id="dayLabel"></span></div>
   <nav class="tabs" aria-label="Screens">
-    <a href="#today">Today</a><a href="#plan">Plan</a><a href="#goals">Goals</a><a href="#work">Work</a><a href="#people">People</a><a href="#diary">Diary</a><a href="#trust">Health</a>
+    <a href="#today">Today</a><a href="#plan">Plan</a><a href="#goals">Goals</a><a href="#work">Work</a><a href="#people">People</a><a href="#diary">Diary</a><a href="#mirror">Mirror</a><a href="#trust">Health</a>
   </nav>
   <span class="spacer"></span>
   <a class="sync" id="sync" href="#trust" title="Brain health"><i class="dot warn"></i><span>Waiting for the brain</span></a>
@@ -394,12 +442,12 @@ const TZ = 'America/New_York';
 const STAGES = ['researching', 'networking', 'applied', 'test', 'first round', 'final round', 'offer', 'closed'];
 const BOX_ORDER = ['career', 'wealth', 'social', 'party', 'unique', 'body', 'together', 'impact'];
 const BOX_HEX = { career: '#8FA0FF', wealth: '#D9B44A', social: '#EC7FA4', party: '#B197FC', unique: '#4FC3D4', body: '#F59F5A', together: '#9FB0C6', impact: '#5FCF92', other: '#8C93A8' };
-const SCREENS = ['today', 'plan', 'goals', 'work', 'people', 'diary', 'trust'];
-const ALIAS = { mirror: 'goals', health: 'trust' };
+const SCREENS = ['today', 'plan', 'goals', 'work', 'people', 'diary', 'mirror', 'trust'];
+const ALIAS = { review: 'mirror', health: 'trust' };
 const NOW_CAP = 8, VIEW_TIMEOUT = 25000, MAX_ORGS = 40;
 let MCP = null;
 const S = { control: null, goals: null, work: null, sky: null, net: null, netAt: 0, person: null, personId: null,
-  week: null, weekStart: null, review: null, reviewMonth: null, trust: null, diary: null, diaryMonth: null, diaryQ: '', diaryEdit: null, pick: null, drag: null, updated: null, err: {},
+  week: null, weekStart: null, review: null, reviewMonth: null, trust: null, diary: null, diaryMonth: null, mirror: null, mirrorMonth: null, mirrorBusy: false, diaryQ: '', diaryEdit: null, pick: null, drag: null, updated: null, err: {},
   ui: { bucket: 'now', pursuit: null, showAll: false, org: null, q: '' } };
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -471,7 +519,7 @@ function errText(e) {
 const DESK_API = 'https://<your-project-ref>.supabase.co/functions/v1/desk';
 const cleanToken = (v) => String(v ?? '').trim().replace(/^.*\//, '').replace(/[?#].*$/, '');
 let TOKEN = cleanToken(store.get('brain_token'));
-const OP_FOR = { update_task: 'update_task', mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block', edit_diary: 'edit_diary' };
+const OP_FOR = { update_task: 'update_task', mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block', edit_diary: 'edit_diary', mirror_answer: 'mirror_answer', mirror_decide: 'mirror_decide', mirror_commit: 'mirror_commit', mirror_close: 'mirror_close', suggestion_done: 'suggestion_done', dismiss_suggestion: 'dismiss_suggestion' };
 const withTimeout = (p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'server_unavailable' }), VIEW_TIMEOUT))]);
 async function direct(method, query, body) {
   if (!TOKEN) throw { code: 'no_token' };
@@ -530,6 +578,7 @@ async function load(which = screen(), quiet = false) {
     if (which === 'people') { await loadNetwork(); if (S.personId) S.person = await view('person', { id: S.personId }); }
     if (which === 'plan') S.week = await view('week', S.weekStart ? { week_start: S.weekStart } : {});
     if (which === 'trust') S.trust = await view('trust');
+    if (which === 'mirror') S.mirror = await view('mirror', S.mirrorMonth ? { month: S.mirrorMonth } : {});
     if (which === 'diary') S.diary = await view('diary', S.diaryQ ? { q: S.diaryQ } : S.diaryMonth ? { month: S.diaryMonth } : {});
     if (which !== 'today') S.control = await view('control');   // header date and sync pill stay current on every screen
     S.err[which] = null; S.updated = new Date();
@@ -594,6 +643,7 @@ function taskRow(c, big3ids = S.control?.big3.map(b => b.id) ?? []) {
     <div class="body"><div class="t">${esc(c.action)}</div><div class="meta"><span class="swatch" style="background:${boxColor(boxKey(c.goal_id))}"></span>${esc(pursuitOf(c))}${flags}</div></div>
     <span class="when ${w.late ? 'late' : ''}">${esc(w.txt)}</span>
     ${closed ? '' : estChip(c)}
+    <button class="xbtn why" type="button" data-why="commitment:${c.id}" aria-label="Why is this here: ${esc(c.action)}" title="Why is this here?">?</button>
     ${closed ? '' : `<button class="xbtn" type="button" data-drop="${c.id}" aria-label="Drop: ${esc(c.action)}" title="Drop this task">×</button>`}
     <button class="star ${on ? 'on' : ''}" type="button" data-star="${c.id}" title="${on ? 'Remove from Big 3' : 'Add to Big 3'}" aria-label="${on ? 'Remove from Big 3' : 'Add to Big 3'}">${on ? '★' : '☆'}</button>
   </div>`;
@@ -684,10 +734,11 @@ function renderToday() {
   const orgName = (id) => S.net?.orgs.find(o => o.id === id)?.name ?? '';
   const coldHtml = S.net ? (cold.map(n => `<button class="lrow click" type="button" data-goperson="${esc(n.id)}"><b style="font-weight:500;flex:1;min-width:0">${esc(n.name)}</b><span class="muted" style="font-size:12.5px;white-space:nowrap">${esc(orgName(n.org))} · ${esc(shortAgo(n.last))}</span></button>`).join('') || '<div class="empty">Nobody has gone quiet for 30+ days.</div>') : '<div class="empty">Loading your network…</div>';
   const owed = c.owed_to_me.map(o => `<div class="lrow"><span style="flex:1"><b style="font-weight:500">${esc(o.owner_name ?? o.owner)}</b> · ${esc(o.action)}</span>${o.due ? `<span class="muted" style="font-size:12.5px;white-space:nowrap">${esc(shortDate(o.due))}</span>` : ''}</div>`).join('') || '<div class="empty">Nobody owes you anything right now.</div>';
-  const yes = c.needs_yes.length ? `<section class="yes" aria-label="Needs your yes"><h2 class="h sm">Needs your yes · ${c.needs_yes.length}</h2>${c.needs_yes.map(p => `<div class="item"><div style="font-weight:500">${esc(p.title)}</div>${p.body ? `<div style="font-size:12.5px;color:var(--ink-2)">${esc(p.body)}</div>` : ''}</div>`).join('')}<div class="muted" style="font-size:12px;margin-top:6px">Answer these in the morning check-in.</div></section>` : '';
+  const yes = outboxHtml(c);
 
   return `<div class="page">
     <div class="goalband"><span class="kicker">Center goal</span><span class="g">${esc(S.goals?.center ?? 'No center goal yet')}</span><span class="spacer"></span><a class="sub" href="#goals">Goals</a></div>
+    ${modeBand(c, items)}
     <section class="top" aria-label="Now and Big 3">${heroHtml(c, items)}
       <div class="card"><div class="chead"><h2 class="h">Big 3</h2>${c.big3.length ? `<span class="sub">${doneN} of ${c.big3.length} done</span>` : ''}</div>${b3}${c.big3.length && doneN === c.big3.length ? '<div class="daydone">Day complete. All three done.</div>' : ''}</div>
     </section>
@@ -706,7 +757,7 @@ function renderToday() {
         <section class="card" aria-label="Going cold"><div class="chead"><h2 class="h sm">Going cold</h2><span class="spacer"></span><a href="#people" style="font-size:13px;font-weight:500">Constellation</a></div>${coldHtml}</section>
         <section class="card" aria-label="Owed to you"><div class="chead"><h2 class="h sm">Owed to you</h2>${c.owed_to_me.length ? `<span class="sub">${c.owed_to_me.length}</span>` : ''}</div>${owed}</section>
       </aside>
-    </div></div>`;
+    </div></div>${nightClock(c, items)}`;
 }
 
 // ── Goals (mandala, week by box, mirror) ───────────────────────────────────────────────────────────
@@ -753,7 +804,7 @@ function renderGoals() {
         return `<div class="mbox"><b style="display:flex;gap:8px;align-items:center;font-weight:600"><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.title)}</b>
           <div style="font-size:13px;margin-top:4px">${m ? `<span class="mono">${m.done_month ?? m.done}</span> done this month · ${m.open} open · ${m.hours} h` : '<span class="muted">No data</span>'}</div>
           <div class="muted" style="font-size:12px;margin-top:2px">${t ? `${esc(t.action)}: target ${t.weekly_target}/wk, judged weekly above` : 'Activity only'}</div></div>`; }).join('')}</div>
-      <p class="muted" style="margin:14px 0 0;font-size:12.5px">The mirror reads only what the brain recorded; time blocks marked actual count as hours.</p>`;
+      <p class="muted" style="margin:14px 0 0;font-size:12.5px">The mirror reads only what the brain recorded. <a href="#mirror">Open the full Mirror review</a> for verdicts, questions and goal decisions.</p>`;
   }
   return `<div class="page">
     <h1 class="h1">Goals</h1>
@@ -1243,6 +1294,200 @@ document.addEventListener('click', (e) => {
 });
 document.addEventListener('keydown', (e) => { if (e.target.id === 'dsearch' && e.key === 'Enter') { S.diaryQ = e.target.value.trim(); S.diaryMonth = null; S.diary = null; render(); load('diary'); } });
 
+
+// ── Mirror ─────────────────────────────────────────────────────────────────────────────────────────
+// Monthly review. Verdicts and evidence come from the database (desk_mirror); his answers, goal decisions and
+// commitments are saved as he goes; goal changes apply only when he closes the review.
+const VERDICT = { on_track: ['on', 'On track'], behind: ['behind', 'Behind'], failing: ['fail', 'Failing'], no_data: ['none', 'No data'] };
+function mirrorHeadline(r) {
+  const c = { on_track: 0, behind: 0, failing: 0, no_data: 0 }; r.boxes.forEach(b => { c[b.verdict]++; });
+  const p = r.promises; const kept = p.kept_on_time + p.kept_late;
+  const parts = [`${c.on_track} of ${r.boxes.length} boxes on track`];
+  if (c.failing) parts.push(`${c.failing} failing`); if (c.behind) parts.push(`${c.behind} behind`); if (c.no_data) parts.push(`${c.no_data} with no data`);
+  return `${parts.join(', ')}. You kept ${kept} promise${kept === 1 ? '' : 's'}${p.kept_late ? ` (${p.kept_late} late)` : ''} and dropped ${p.dropped}.`;
+}
+function renderMirror() {
+  const r = S.mirror; if (!r) return S.err.mirror ? notice(S.err.mirror) : loading();
+  const rv = r.review ?? { answers: {}, decisions: {}, commitments: [], closed_at: null }; const closed = !!rv.closed_at;
+  const p = r.promises; const total = p.kept_on_time + p.kept_late + p.dropped;
+  const rel = total ? Math.round(100 * p.kept_on_time / total) : null;
+  const order = (b) => { const i = BOX_ORDER.indexOf(b.box); return i < 0 ? 99 : i; };
+  const rank = { failing: 0, behind: 1, no_data: 2, on_track: 3 };
+  const boxes = [...r.boxes].sort((a, b) => rank[a.verdict] - rank[b.verdict] || order(a) - order(b));
+  const boxCard = (b) => {
+    const v = VERDICT[b.verdict]; const ans = rv.answers?.[b.id]?.text ?? ''; const dec = rv.decisions?.[b.id] ?? {};
+    const decBtn = (k, label) => `<button type="button" aria-pressed="${dec.decision === k}" data-mdec="${b.id}" data-k="${k}" ${closed ? 'disabled' : ''}>${label}</button>`;
+    return `<section class="card" id="m-${esc(b.box)}"><div class="mbx">
+      <div><div class="chead" style="margin:0"><span class="swatch" style="background:${boxColor(b.box)}"></span><h2 class="h sm" style="flex:1">${esc(b.title)}</h2><span class="verdict ${v[0]}">${v[1]}</span></div>
+        <ul class="ev">${b.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul>
+        ${b.quote ? `<div class="dquote" style="margin-top:12px">“${esc(b.quote.text)}” <span class="muted" style="font-style:normal;font-size:12px">${esc(shortDate(b.quote.day))}</span></div>` : ''}
+        ${b.tracker ? `<div class="sub" style="margin-top:10px">Tracker: ${esc(b.tracker)}</div>` : ''}</div>
+      <div><ol class="qs">${b.questions.map(q => `<li>${esc(q)}</li>`).join('')}</ol>
+        <textarea id="mans-${esc(b.box)}" data-mans="${b.id}" placeholder="${closed ? 'No answer written.' : 'Answer honestly, in a few lines. Saved when you click away.'}" ${closed ? 'readonly' : ''} aria-label="Your answer for ${esc(b.title)}">${esc(ans)}</textarea>
+        <div class="mdec"><span class="sub">This box next month:</span><div class="seg" role="group" aria-label="Decision for ${esc(b.title)}">${decBtn('keep', 'Keep')}${decBtn('rewrite', 'Rewrite')}${decBtn('pause', 'Pause')}${decBtn('drop', 'Drop')}</div><span class="saved" id="msv-${esc(b.box)}"></span></div>
+        ${dec.decision === 'rewrite' ? `<div class="mrw"><input id="mrw-${esc(b.box)}" data-mrw="${b.id}" value="${esc(dec.new_title ?? '')}" placeholder="New wording for this box" ${closed ? 'readonly' : ''} aria-label="New wording"></div>` : ''}
+      </div></div></section>`;
+  };
+  const last = r.last_review?.commitments?.length ? `<section class="card"><div class="chead"><h2 class="h sm">You committed to these last month</h2></div>
+      <div class="mlist">${r.last_review.commitments.map(c => `<div class="lrow"><span class="mtag ${c.status === 'done' ? '' : c.due && c.due < (S.control?.mode?.day ?? '') ? 'overdue' : ''}">${esc(c.status)}</span><b style="flex:1">${esc(c.action)}</b><span class="mono muted">${esc(shortDate(c.due))}</span></div>`).join('')}</div></section>` : '';
+  const list = (arr, empty) => arr.length ? `<div class="mlist">${arr.map(x => `<div class="lrow">${x.kind ? `<span class="mtag ${x.kind}">${esc(x.kind)}</span>` : ''}<span style="flex:1">${esc(x.action)}</span><span class="mono muted">${esc(shortDate(x.due ?? x.at))}</span></div>`).join('')}</div>` : `<div class="empty">${empty}</div>`;
+  const boxOpts = boxes.filter(b => b.verdict !== 'no_data' || true).map(b => `<option value="${esc(b.id)}">${esc(String(b.title).split(':')[0])}</option>`).join('');
+  return `<div class="page">
+    <div class="mhead"><h1 class="h1">Mirror</h1><span class="sub">${esc(r.label)}${r.partial ? ` · so far, through ${esc(shortDate(r.through))}` : ''}${closed ? ` · closed ${esc(shortDate(rv.closed_at))}` : ''}</span><span class="spacer"></span>
+      <button class="btn" type="button" data-mmonth="-1" aria-label="Previous month">‹</button><button class="btn" type="button" data-mmonth="0">Review month</button><button class="btn" type="button" data-mmonth="1" aria-label="Next month">›</button></div>
+    <p class="mline">${esc(mirrorHeadline(r))}</p>
+    ${last}
+    <section class="card"><div class="stats"><div><b>${p.kept_on_time}</b><span>kept on time</span></div><div><b>${p.kept_late}</b><span>kept late</span></div><div><b>${p.dropped}</b><span>dropped</span></div>
+      <div><b style="color:${p.overdue_now ? 'var(--warn)' : 'var(--good)'}">${p.overdue_now}</b><span>overdue now (target 0)</span></div><div><b>${rel == null ? '–' : rel + '%'}</b><span>reliability</span></div>
+      <div><b>${p.owed_to_others_done}/${p.owed_to_others_done + p.owed_to_others_open}</b><span>promises to others kept</span></div><div><b>${r.diary_days}</b><span>diary days</span></div></div>
+      ${r.approximate_note ? `<p class="pickhint" style="margin:14px 0 0">${esc(r.approximate_note)}</p>` : ''}</section>
+    ${boxes.map(boxCard).join('')}
+    <div class="row2">
+      <section class="card grow" style="flex-basis:420px"><div class="chead"><h2 class="h sm">What went well</h2></div>${list(r.went_well, 'Nothing was marked done this month.')}</section>
+      <section class="card grow" style="flex-basis:420px"><div class="chead"><h2 class="h sm">What went wrong</h2></div>${list(r.went_wrong, 'Nothing dropped, late or overdue.')}</section>
+    </div>
+    <section class="card"><div class="chead"><h2 class="h sm">Commitments for next month</h2><span class="sub">Dated, specific, and they open next month's review. Each one also becomes a task.</span></div>
+      ${list((rv.commitments ?? []).map(c => ({ action: c.action, due: c.due })), 'None yet.')}
+      ${closed ? '' : `<div class="mform" style="margin-top:12px"><input id="mcTitle" placeholder="I will…" aria-label="Commitment"><input id="mcDue" type="date" aria-label="By when"><select id="mcBox" aria-label="Box"><option value="">No box</option>${boxOpts}</select><button class="btn primary" type="button" data-mcommit="1">Add</button></div>`}</section>
+    ${closed ? '' : `<section class="card mclose"><div style="flex:1;min-width:240px"><b style="font-family:var(--f-head)">Close the review</b><div class="sub">Applies your rewrite, pause and drop decisions to the goals and saves the review to your memory and diary.</div></div>
+      ${S.mirrorConfirm ? `<button class="btn" type="button" data-mclose="cancel">Not yet</button><button class="btn primary" type="button" data-mclose="go" ${S.mirrorBusy ? 'disabled' : ''}>Yes, close ${esc(r.label)}</button>` : `<button class="btn primary" type="button" data-mclose="ask">Close review</button>`}</section>`}
+  </div>`;
+}
+function mflash(box, msg) { const el = document.getElementById('msv-' + box); if (el) { el.textContent = msg; setTimeout(() => { if (el.textContent === msg) el.textContent = ''; }, 2500); } }
+const boxOfId = (id) => S.mirror?.boxes.find(b => b.id === id)?.box ?? '';
+async function mirrorSaveAnswer(el) {
+  const id = el.dataset.mans; const text = el.value; const rv = (S.mirror.review ??= { answers: {}, decisions: {}, commitments: [], closed_at: null });
+  if ((rv.answers?.[id]?.text ?? '') === text.trim()) return;
+  rv.answers = { ...(rv.answers ?? {}), [id]: { text: text.trim() } };
+  try { await act('mirror_answer', { month: S.mirror.month, box: id, answer: text }); mflash(boxOfId(id), 'Saved'); }
+  catch (e) { needsUpdate('Saving review answers')(e); }
+}
+async function mirrorDecide(id, k, newTitle) {
+  const rv = (S.mirror.review ??= { answers: {}, decisions: {}, commitments: [], closed_at: null });
+  const cur = rv.decisions?.[id]?.decision;
+  if (k === 'rewrite' && newTitle == null) { rv.decisions = { ...(rv.decisions ?? {}), [id]: { decision: 'rewrite', new_title: rv.decisions?.[id]?.new_title ?? '' } }; render(); document.getElementById('mrw-' + boxOfId(id))?.focus(); return; }
+  const to = cur === k && k !== 'rewrite' ? 'undecided' : k;
+  const before = rv.decisions?.[id];
+  rv.decisions = { ...(rv.decisions ?? {}) }; if (to === 'undecided') delete rv.decisions[id]; else rv.decisions[id] = { decision: to, new_title: newTitle ?? null };
+  render();
+  try { await act('mirror_decide', { month: S.mirror.month, goal_id: id, decision: to, new_title: newTitle ?? null }); mflash(boxOfId(id), to === 'undecided' ? 'Cleared' : 'Saved'); }
+  catch (e) { if (before) rv.decisions[id] = before; else delete rv.decisions[id]; render(); needsUpdate('Saving decisions')(e); }
+}
+async function mirrorCommit() {
+  const title = $('#mcTitle')?.value.trim(); const due = $('#mcDue')?.value; const box = $('#mcBox')?.value || null;
+  if (!title || !due) { toast('Write what you will do and pick a date.'); return; }
+  try { await act('mirror_commit', { month: S.mirror.month, title, due, goal_id: box }); toast('Added. It is also on your task list.'); load('mirror', true); }
+  catch (e) { needsUpdate('Adding commitments')(e); }
+}
+async function mirrorClose() {
+  S.mirrorBusy = true; render();
+  try { const r = await act('mirror_close', { month: S.mirror.month }); S.mirrorConfirm = false; toast(`Review closed. ${r?.goal_changes ?? 0} goal change${r?.goal_changes === 1 ? '' : 's'} applied.`); await load('mirror', true); }
+  catch (e) { needsUpdate('Closing the review')(e); }
+  S.mirrorBusy = false; render();
+}
+document.addEventListener('focusout', (e) => {
+  if (e.target.dataset?.mans != null && S.mirror && !S.mirror.review?.closed_at) mirrorSaveAnswer(e.target);
+  if (e.target.dataset?.mrw != null && S.mirror && e.target.value.trim()) mirrorDecide(e.target.dataset.mrw, 'rewrite', e.target.value.trim());
+});
+document.addEventListener('keydown', (e) => { if (e.target.dataset?.mrw != null && e.key === 'Enter' && e.target.value.trim()) e.target.blur(); });
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-mmonth],[data-mdec],[data-mcommit],[data-mclose]'); if (!t) return;
+  if (t.dataset.mmonth != null) { const n = +t.dataset.mmonth; if (n === 0) S.mirrorMonth = null; else { const d = new Date((S.mirror?.month ?? ymd(new Date())).slice(0, 7) + '-01T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() + n); S.mirrorMonth = d.toISOString().slice(0, 7); } S.mirror = null; render(); return load('mirror'); }
+  if (t.dataset.mdec) return mirrorDecide(t.dataset.mdec, t.dataset.k);
+  if (t.dataset.mcommit) return mirrorCommit();
+  if (t.dataset.mclose === 'ask') { S.mirrorConfirm = true; return render(); }
+  if (t.dataset.mclose === 'cancel') { S.mirrorConfirm = false; return render(); }
+  if (t.dataset.mclose === 'go') return mirrorClose();
+});
+
+
+// ── Control room: time-of-day band, outbox, night clock, why sheet ─────────────────────────────────
+function modeBand(c, items) {
+  const m = c.mode.mode; const b3 = c.big3; const left = b3.filter(b => b.status !== 'done'); const firstOpen = left[0];
+  const nowNext = items.find(i => new Date(i.end ?? i.start) > Date.now());
+  if (b3.length && !left.length) return `<div class="modeband done" role="status"><span class="mk">Day complete</span><span class="mt">All three done. That is the day.</span><a class="sub" href="#diary">Diary</a></div>`;
+  if (m === 'morning') return b3.length
+    ? `<div class="modeband morning"><span class="mk">Morning</span><span class="mt">Big 3 set. Start with: ${esc(firstOpen?.action ?? b3[0].action)}</span></div>`
+    : `<div class="modeband morning"><span class="mk">Morning</span><span class="mt">Pick your Big 3: star three tasks below, or name them in your morning check-in.</span></div>`;
+  if (m === 'evening') return `<div class="modeband"><span class="mk">Evening</span><span class="mt">${b3.length ? `${left.length} of your Big 3 still open.` : 'No Big 3 today.'} Close the day with your evening check-in in Claude.</span><a class="sub" href="#diary">Diary</a></div>`;
+  if (m === 'night') return `<div class="modeband"><span class="mk">Night</span><span class="mt">${nowNext ? `Tomorrow starts with ${esc(nowNext.title)} at ${tme(nowNext.start)}.` : 'Nothing on the calendar tomorrow morning.'}</span><button class="btn" type="button" data-night="on">Night clock</button></div>`;
+  return `<div class="modeband"><span class="mk">Focus</span><span class="mt">${firstOpen ? `Next on your Big 3: ${esc(firstOpen.action)}` : 'No Big 3 yet. Star up to three tasks.'}</span></div>`;
+}
+function nightClock(c, items) {
+  if (c.mode.mode !== 'night' || screen() !== 'today' || (S.nightOff ?? 0) > Date.now()) return '';
+  const next = items.find(i => new Date(i.start) > Date.now());
+  const t = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' }).format(new Date()).replace(/\s?[AP]M$/i, '');
+  const d = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  const open = c.big3.filter(b => b.status !== 'done').length;
+  return `<button class="nightclock" type="button" data-night="off" aria-label="Night clock. Tap to show the desk.">
+    <div class="t">${esc(t)}</div><div class="d">${esc(d)}</div>
+    <div class="n">${next ? `First up: ${esc(next.title)} at ${tme(next.start)}` : 'Nothing early on the calendar.'}${c.big3.length ? ` · Big 3: ${c.big3.length - open} of ${c.big3.length} done` : ''}</div>
+    <div class="h2">Tap to show the desk for 30 minutes</div></button>`;
+}
+function outboxHtml(c) {
+  const items = c.needs_yes; if (!items.length) return '';
+  const show = S.ui.obAll ? items : items.slice(0, 4);
+  const one = (p) => {
+    const cid = p.commitment_id ? +p.commitment_id : null;
+    const draft = p.kind === 'followup' ? (p.payload?.draft ?? p.body) : null;
+    const acts = p.kind === 'followup'
+      ? `<button class="btn" type="button" data-copy="${esc(draft ?? '')}">Copy draft</button><button class="btn primary" type="button" data-obdone="${p.id}">I sent it</button>`
+      : p.kind === 'calendar'
+        ? `${cid ? `<button class="btn primary" type="button" data-obplan="${cid}" data-obid="${p.id}">Plan a block</button>` : ''}<button class="btn" type="button" data-obdone="${p.id}">Already handled</button>`
+        : `<button class="btn primary" type="button" data-obdone="${p.id}">Keep the task</button>${cid ? `<button class="btn" type="button" data-obdrop="${cid}" data-obid="${p.id}">Drop it</button>` : ''}`;
+    return `<div class="item"><div style="font-weight:500">${esc(p.title)}</div>
+      ${draft ? `<div class="draft">${esc(draft)}</div>` : p.body ? `<div style="font-size:12.5px;color:var(--ink-2)">${esc(p.body)}</div>` : ''}
+      <div class="acts">${acts}<button class="btn" type="button" data-obdismiss="${p.id}">Dismiss</button><button class="xbtn why" type="button" data-why="suggestion:${p.id}" title="Why is this here?" aria-label="Why is this suggestion here">?</button></div></div>`;
+  };
+  return `<section class="yes" aria-label="Needs your yes"><h2 class="h sm">Needs your yes · ${items.length}</h2>${show.map(one).join('')}
+    ${items.length > 4 ? `<button class="linkbtn" type="button" data-obmore="1" style="margin-top:8px">${S.ui.obAll ? 'Show fewer' : `Show all ${items.length}`}</button>` : ''}
+    <div class="muted" style="font-size:12px;margin-top:6px">Nothing here is ever sent for you. Send it yourself, then mark it.</div></section>`;
+}
+async function obAct(id, tool, label) {
+  const c = S.control; const before = c.needs_yes; c.needs_yes = c.needs_yes.filter(p => p.id !== id); render();
+  try { await act(tool, { id, note: label }); toast(label + '.'); }
+  catch (e) { c.needs_yes = before; render(); needsUpdate('This action')(e); }
+}
+function closeWhy() { document.querySelectorAll('.whysheet').forEach(x => x.remove()); }
+async function openWhy(key) {
+  closeWhy(); const [kind, id] = key.split(':');
+  const el = document.createElement('aside'); el.className = 'whysheet'; el.setAttribute('aria-label', 'Why is this here');
+  el.innerHTML = '<button class="btn x" type="button" data-whyclose="1">Close</button><div class="empty">Looking it up…</div>'; document.body.appendChild(el);
+  try { const w = await view('why', { kind, id }); el.innerHTML = '<button class="btn x" type="button" data-whyclose="1">Close</button>' + whyHtml(w); }
+  catch (e) { el.innerHTML = `<button class="btn x" type="button" data-whyclose="1">Close</button><div class="notice" style="margin:40px 0 0"><b>Could not look this up</b>${esc(newToolMissing(e) ? 'This needs the updated connector. Reconnect Second Brain in Settings, Connectors.' : errText(e))}</div>`; }
+}
+function whyHtml(w) {
+  const block = (lbl, html) => html ? `<div><div class="lbl">${lbl}</div>${html}</div>` : '';
+  const src = (s) => s ? `<div style="font-size:13px;margin-bottom:6px"><b style="font-weight:500">${esc(s.title ?? 'Source')}</b> <span class="muted">${esc(s.provider ?? '')} · ${esc(s.date ? fmt(s.date, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')}</span>${s.url ? ` · <a href="${esc(s.url)}" target="_blank" rel="noopener">open</a>` : ''}</div>${s.excerpt ? `<div class="src">${esc(s.excerpt)}</div>` : ''}` : '';
+  if (w.kind === 'suggestion') return `<h2 class="h" style="margin-right:70px">${esc(w.what)}</h2>
+    ${block('Suggested by', `<div style="font-size:13.5px">The ${esc(w.agent)} agent, ${esc(fmt(w.made, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }))}</div>`)}
+    ${block('What it says', w.body ? `<div style="font-size:13.5px;white-space:pre-wrap">${esc(w.body)}</div>` : '')}
+    ${w.task ? `<hr style="border:0;border-top:1px solid var(--line);width:100%">${whyHtml(w.task)}` : ''}`;
+  if (w.kind === 'fact') return `<h2 class="h" style="margin-right:70px">${esc(w.about)}: ${esc(w.what)}</h2>
+    ${block('How sure', `<div style="font-size:13.5px">${esc(w.class)} · confidence ${Math.round((w.confidence ?? 0) * 100)}% · since ${esc(shortDate(w.since))}</div>`)}
+    ${block('Evidence', w.evidence ? `<div style="font-size:13.5px">${esc(w.evidence)}</div>` : '')}${block('Source', src(w.source))}
+    ${block('Earlier values', w.earlier.length ? `<div class="hist">${w.earlier.map(x => `<div>${esc(x.value)} <span class="muted">· ${esc(shortDate(x.since))} · ${esc(x.status)}</span></div>`).join('')}</div>` : '')}`;
+  return `<h2 class="h" style="margin-right:70px">${esc(w.what)}</h2>
+    ${block('The task', `<div style="font-size:13.5px">${esc(w.status)}${w.due ? ` · due ${esc(shortDate(w.due))}` : ''} · owner ${esc(w.owner)}${w.for ? ` · for ${esc(w.for)}` : ''}${w.pursuit ? ` · ${esc(w.pursuit)}` : ''}${w.box ? ` · ${esc(String(w.box).split(':')[0])}` : ''}</div>`)}
+    ${block('Why the brain added it', `<div style="font-size:13.5px">${esc(w.evidence ?? '')}</div><div class="muted" style="font-size:12.5px;margin-top:4px">Added ${esc(shortDate(w.added))} by ${esc(w.added_by ?? 'the compiler')}</div>`)}
+    ${block('Source', src(w.source))}
+    ${block('Rests on', w.depends_on.length ? `<div class="hist">${w.depends_on.map(d => `<div>${esc(d.fact)}${d.value ? `: ${esc(d.value)}` : ''}</div>`).join('')}</div>` : '')}
+    ${block('What changed', w.history.length ? `<div class="hist">${w.history.map(h => `<div>${esc(h.what ?? '')} <span class="muted">· ${esc(shortDate(h.at))}${h.why ? ' · ' + esc(h.why) : ''}</span></div>`).join('')}</div>` : '')}`;
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-why],[data-whyclose],[data-night],[data-obdone],[data-obdismiss],[data-obplan],[data-obdrop],[data-obmore]'); if (!t) return;
+  if (t.dataset.why) return openWhy(t.dataset.why);
+  if (t.dataset.whyclose) return closeWhy();
+  if (t.dataset.night === 'off') { S.nightOff = Date.now() + 30 * 6e4; return render(); }
+  if (t.dataset.night === 'on') { S.nightOff = 0; return render(); }
+  if (t.dataset.obmore) { S.ui.obAll = !S.ui.obAll; return render(); }
+  if (t.dataset.obdone) return obAct(+t.dataset.obdone, 'suggestion_done', 'Marked done');
+  if (t.dataset.obdismiss) return obAct(+t.dataset.obdismiss, 'dismiss_suggestion', 'Dismissed');
+  if (t.dataset.obdrop) { mark(+t.dataset.obdrop, 'dropped'); return obAct(+t.dataset.obid, 'suggestion_done', 'Task dropped'); }
+  if (t.dataset.obplan) { S.pick = +t.dataset.obplan; obAct(+t.dataset.obid, 'suggestion_done', 'Pick a slot on the week'); location.hash = '#plan'; return; }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeWhy(); });
+
 // ── Shell ──────────────────────────────────────────────────────────────────────────────────────────
 function loading() { return '<div class="page"><div class="empty">Loading…</div></div>'; }
 function notice(e) { return `<div class="notice"><b>This screen could not load</b>${esc(errText(e))}</div>`; }
@@ -1259,7 +1504,7 @@ function status() {
 function render() {
   const s = screen();
   document.querySelectorAll('nav.tabs a').forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + s ? 'page' : 'false'));
-  const html = { today: renderToday, goals: renderGoals, work: renderWork, people: renderPeople, plan: renderPlan, diary: renderDiary, trust: renderTrust }[s]();
+  const html = { today: renderToday, goals: renderGoals, work: renderWork, people: renderPeople, plan: renderPlan, diary: renderDiary, mirror: renderMirror, trust: renderTrust }[s]();
   const m = $('#main'); const keep = m.scrollTop; const gTop = $('#gridwrap')?.scrollTop; const pcTop = $('.pcard')?.scrollTop;
   const focusId = document.activeElement?.id; const caret = document.activeElement?.selectionStart;
   m.innerHTML = html; m.scrollTop = keep;

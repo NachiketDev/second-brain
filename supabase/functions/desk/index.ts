@@ -1,8 +1,8 @@
 // DESK: read and act API for the standalone desk apps (v1 and v2) when they run outside Claude.
 // Auth: brain_mcp_secret, sent in the x-brain-token header or as the last path segment. Wrong token = 404.
 // v1: GET returns the brain_desk bundle; POST {action:'done'|'dropped'|'open', id} marks one of HIS commitments.
-// v2: GET ?view=control|goals|workbench|people|person|week|review|trust|health|diary (+ org, id, week_start, month, q)
-//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (mark, set_priorities, update_pursuit, plan_block, delete_block, update_task, edit_diary) (all through brain_* functions).
+// v2: GET ?view=control|goals|workbench|people|person|week|review|trust|health|diary|mirror|why (+ org, id, week_start, month, q, kind)
+//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (mark, set_priorities, update_pursuit, plan_block, delete_block, update_task, edit_diary, mirror_answer, mirror_decide, mirror_commit, mirror_close, suggestion_done, dismiss_suggestion) (all through brain_* functions).
 // Nothing is ever sent to anyone from here; Google Tasks gets a copy of his own task changes.
 import { checkSecret, db } from '../_shared/lib.ts';
 import { gConfigured, pushGoogleTasks } from '../_shared/gtasks.ts';
@@ -21,7 +21,11 @@ const VIEWS: Record<string, (q: URLSearchParams) => [string, Record<string, unkn
   trust:     () => ['desk_trust', {}],
   health:    () => ['desk_health', {}],
   diary:     (q) => ['desk_diary', { p_month: q.get('month') || null, p_q: q.get('q') || null }],
+  mirror:    (q) => ['desk_mirror', { p_month: monthDate(q.get('month')) }],
+  why:       (q) => ['desk_why', { p_kind: q.get('kind') ?? '', p_id: q.get('id') ?? '' }],
 };
+// 'YYYY-MM' or 'YYYY-MM-DD' -> first day of that month; anything else -> null (the review month).
+function monthDate(v: unknown) { const m = /^(\d{4}-\d{2})/.exec(String(v ?? '')); return m ? `${m[1]}-01` : null; }
 
 async function rpc(fn: string, params: Record<string, unknown>) {
   const { data, error } = await db().rpc(fn, params);
@@ -54,6 +58,13 @@ const OPS: Record<string, (b: any) => Promise<unknown>> = {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.day ?? '')) || !String(b.body ?? '').trim()) throw new Error('bad request');
     return rpc('brain_edit_diary', { p_day: b.day, p_body: String(b.body), p_mood: b.mood ?? null });
   },
+  mirror_answer: (b) => rpc('brain_mirror_answer', { p_month: monthDate(b.month), p_box: String(b.box ?? ''), p_answer: String(b.answer ?? '') }),
+  mirror_decide: (b) => rpc('brain_mirror_decide', { p_month: monthDate(b.month), p_goal_id: String(b.goal_id ?? ''), p_decision: String(b.decision ?? ''),
+    p_new_title: b.new_title ?? null, p_note: b.note ?? null }),
+  mirror_commit: (b) => rpc('brain_mirror_commit', { p_month: monthDate(b.month), p_title: String(b.title ?? ''), p_due: b.due ?? null, p_goal_id: b.goal_id ?? null }),
+  suggestion_done: (b) => rpc('brain_proposal_done', { p_id: Number(b.id), p_note: b.note ?? null }),
+  dismiss_suggestion: (b) => rpc('brain_dismiss_proposal', { p_id: Number(b.id), p_note: b.note ?? null }),
+  mirror_close: (b) => rpc('brain_mirror_close', { p_month: monthDate(b.month) }),
   update_task: async (b) => {
     const f: Record<string, unknown> = {};
     for (const [k, col] of [['pursuit_id', 'pursuit_id'], ['goal_id', 'goal_id'], ['due_date', 'due_at'], ['estimate_min', 'estimate_min'], ['title', 'action']])
