@@ -1,0 +1,1424 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}
+/* Diary: a month strip on the left, entries as pages on the right. His words stand out as quotes. */
+.dhead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dhead .spacer { flex: 1; }
+.dsearch { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 9px; padding: 6px 12px; width: min(260px, 100%); }
+.dmonth { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dmonth .dow { font-size: 11px; color: var(--ink-4); text-align: center; padding-bottom: 2px; }
+.dmonth .dd { aspect-ratio: 1; border-radius: 8px; border: 0; background: transparent; color: var(--ink-4); font: 500 12.5px var(--f-mono); display: flex; align-items: center; justify-content: center; position: relative; }
+.dmonth .dd.has { background: var(--accent-soft); color: var(--accent-ink); cursor: pointer; }
+.dmonth .dd.has:hover { outline: 1px solid var(--accent); }
+.dmonth .dd.wait::after { content: ""; position: absolute; bottom: 4px; width: 4px; height: 4px; border-radius: 50%; background: var(--warn); }
+.dmonth .dd.today { box-shadow: inset 0 0 0 1.5px var(--ink-3); }
+.dentry { scroll-margin-top: 90px; }
+.dentry .dtop { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.dentry .dday { font: 600 19px var(--f-head); letter-spacing: -0.01em; }
+.dentry .mood { font-size: 12.5px; color: var(--ink-2); background: var(--sunk); border-radius: 999px; padding: 2px 10px; }
+.dbody { max-width: 68ch; line-height: 1.62; color: var(--ink); }
+.dbody p { margin: 0 0 10px; }
+.dquote { margin: 12px 0 4px; padding: 2px 0 2px 14px; border-left: 2px solid var(--accent); color: var(--ink-2); font-style: italic; max-width: 64ch; }
+.dlinks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+.dfoot { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--ink-3); flex-wrap: wrap; }
+.dfoot .spacer { flex: 1; }
+.dedit textarea { box-sizing: border-box; width: 100%; min-height: 220px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); padding: 12px 14px; font: 15px/1.6 var(--f-body); resize: vertical; }
+.dedit input { border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--ink); padding: 6px 10px; width: min(320px, 100%); }
+.dedit .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+</style>
+<title>Brain Desk</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>
+// Theme before first paint: 'auto' follows the system; the space theme is the dark one.
+(function () { var p = 'auto'; try { p = localStorage.getItem('desk_theme') || 'auto'; } catch (e) {}
+  var dark = p === 'dark' || (p === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light'; document.documentElement.dataset.pref = p; })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<style>
+/* Desk. Light: warm paper. Dark: deep space, glass panels, nebula light. The constellation is always night. */
+:root {
+  color-scheme: light;
+  --bg: #F5F4F0; --panel: #FFFFFF; --sunk: #EFEDE7; --line: #E6E3DC; --line2: #EFEDE7;
+  --ink: #17181C; --ink-2: #4B4D55; --ink-3: #6E7079; --ink-4: #A9ABB3;
+  --accent: #3346D3; --accent-ink: #2433A8; --accent-soft: #ECEEFC;
+  --warn: #9A5B00; --warn-soft: #FBF3E6; --warn-line: #EEDDC2; --bad: #B3261E; --good: #1F7A4A; --good-soft: #E3F3EA;
+  --hero-bg: #17181C; --hero-line: transparent; --hero-ink: #F5F4F0; --hero-2: #A9ABB3; --now: #C2410C;
+  --cls: #ECEAE4; --evt-bg: #17181C; --evt-ink: #F5F4F0; --evt-line: transparent;
+  --tab-on-bg: #17181C; --tab-on-ink: #F5F4F0; --blur: none;
+  --b-career: #3346D3; --b-wealth: #8A6B12; --b-social: #B4446C; --b-party: #6B46C1; --b-unique: #0F7C8C; --b-body: #C2540A; --b-together: #4A5A6E; --b-impact: #1F7A4A;
+  --f-body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-head: "Space Grotesk", Inter, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #070A14; --panel: rgba(16,21,40,.78); --sunk: rgba(143,160,255,.07); --line: rgba(143,160,255,.15); --line2: rgba(143,160,255,.08);
+  --ink: #E8EBF7; --ink-2: #B4BAD0; --ink-3: #8C94AE; --ink-4: #5C6480;
+  --accent: #8FA0FF; --accent-ink: #C3CCFF; --accent-soft: rgba(143,160,255,.15);
+  --warn: #F0B155; --warn-soft: rgba(240,177,85,.10); --warn-line: rgba(240,177,85,.22); --bad: #FF8A80; --good: #5FCF92; --good-soft: rgba(95,207,146,.13);
+  --hero-bg: radial-gradient(circle at 88% 12%, rgba(143,160,255,.38), transparent 46%), radial-gradient(circle at 10% 100%, rgba(177,151,252,.25), transparent 50%), linear-gradient(135deg, #172052, #0E1230 55%, #1C1238);
+  --hero-line: rgba(143,160,255,.28); --hero-ink: #F3F5FF; --hero-2: #A9B2D6; --now: #FF8A5C;
+  --cls: rgba(255,255,255,.07); --evt-bg: rgba(143,160,255,.20); --evt-ink: #EEF0FF; --evt-line: rgba(143,160,255,.40);
+  --tab-on-bg: rgba(143,160,255,.18); --tab-on-ink: #DDE2FF; --blur: blur(10px);
+  --b-career: #8FA0FF; --b-wealth: #D9B44A; --b-social: #EC7FA4; --b-party: #B197FC; --b-unique: #4FC3D4; --b-body: #F59F5A; --b-together: #9FB0C6; --b-impact: #5FCF92;
+}
+
+html, body { height: 100%; }
+body { background-color: var(--bg); color: var(--ink); font: 14px/1.45 var(--f-body); display: flex; flex-direction: column; }
+:root[data-theme="dark"] body { background-image: radial-gradient(ellipse 70% 55% at 78% -12%, rgba(88,108,255,.22), transparent 62%), radial-gradient(ellipse 55% 45% at -5% 105%, rgba(170,90,255,.14), transparent 60%), var(--stars, none); background-attachment: fixed; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-3); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.spacer { flex: 1; }
+
+/* Shell */
+header.bar { flex: none; display: flex; align-items: center; gap: 22px; padding-block: 12px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(28px, env(safe-area-inset-right, 0px)); border-bottom: 1px solid var(--line); flex-wrap: wrap; backdrop-filter: var(--blur); }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand b { font: 600 18px var(--f-head); letter-spacing: -0.02em; }
+.brand .day { color: var(--ink-3); }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+nav.tabs a { color: var(--ink-2); padding: 6px 13px; border-radius: 999px; font-weight: 500; }
+nav.tabs a:hover { background: var(--sunk); }
+nav.tabs a[aria-current="page"] { background: var(--tab-on-bg); color: var(--tab-on-ink); }
+.sync { display: inline-flex; align-items: center; gap: 8px; color: var(--ink-2); font-size: 12.5px; border: 1px solid var(--line); background: transparent; padding: 5px 11px; border-radius: 999px; }
+.sync:hover { border-color: var(--ink-4); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none; box-shadow: 0 0 8px currentColor; color: var(--good); }
+.dot.warn { background: var(--warn); color: var(--warn); } .dot.bad { background: var(--bad); color: var(--bad); }
+.iconbtn { border: 1px solid var(--line); background: transparent; border-radius: 9px; padding: 5px 11px; color: var(--ink-2); }
+.iconbtn:hover { border-color: var(--ink-4); color: var(--ink); }
+main { flex: 1; min-height: 0; overflow: auto; }
+.page { max-width: 1380px; margin: 0 auto; padding: 26px max(28px, env(safe-area-inset-right, 0px)) 48px max(28px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 20px; }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 24px; min-width: 0; backdrop-filter: var(--blur); }
+.chead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.h { margin: 0; font: 600 18px var(--f-head); letter-spacing: -0.01em; }
+.h.sm { font-size: 15.5px; }
+.h1 { margin: 0; font: 600 26px var(--f-head); letter-spacing: -0.02em; }
+.sub { color: var(--ink-3); font-size: 13px; }
+.kicker { font-size: 11.5px; font-weight: 600; color: var(--ink-3); text-transform: uppercase; letter-spacing: .1em; }
+.row2 { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.grow { flex: 999 1 560px; min-width: 0; }
+.rail { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.empty { color: var(--ink-3); padding: 6px 0; }
+.notice { border: 1px solid var(--line); background: var(--panel); border-radius: 16px; padding: 20px 22px; max-width: 640px; margin: 40px auto; }
+.notice b { display: block; margin-bottom: 4px; font-family: var(--f-head); font-size: 16px; }
+.swatch { width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block; }
+.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 9px; padding: 6px 12px; font-weight: 500; }
+.btn:hover { border-color: var(--ink-4); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #0A0D1C; }
+.btn.danger { color: var(--bad); }
+.linkbtn { border: 0; background: transparent; color: var(--accent); padding: 0; font-weight: 500; text-align: left; }
+.linkbtn:hover { text-decoration: underline; }
+.seg { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--sunk); }
+.seg button { border: 0; border-radius: 8px; padding: 5px 12px; font-size: 13px; font-weight: 500; background: transparent; color: var(--ink-3); }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: rgba(143,160,255,.2); }
+.seg .num { font-weight: 400; color: var(--ink-3); margin-left: 4px; }
+.chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.chip { border: 1px solid var(--line); background: transparent; color: var(--ink-2); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { background: var(--tab-on-bg); border-color: transparent; color: var(--tab-on-ink); }
+.chip .num { opacity: .65; }
+.meter { height: 6px; border-radius: 3px; background: var(--sunk); overflow: hidden; margin-top: 6px; }
+.meter i { display: block; height: 100%; border-radius: 3px; transition: width .6s ease; }
+:root[data-theme="dark"] .meter i { box-shadow: 0 0 10px currentColor; }
+.lrow { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line2); align-items: baseline; }
+.lrow:last-child { border-bottom: 0; }
+.lrow.click { width: 100%; border-left: 0; border-right: 0; border-top: 0; background: transparent; text-align: left; }
+.lrow.click:hover b { color: var(--accent); }
+.flag { color: var(--warn); font-weight: 500; }
+
+/* Today */
+.goalband { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.goalband .g { font: 600 19px var(--f-head); letter-spacing: -0.01em; }
+.top { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+.hero { background: var(--hero-bg); border: 1px solid var(--hero-line); color: var(--hero-ink); border-radius: 16px; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; min-height: 200px; }
+.hero .lab { font-size: 12.5px; color: var(--hero-2); font-weight: 500; }
+.hero .what { font: 600 32px/1.1 var(--f-head); letter-spacing: -0.02em; text-wrap: balance; }
+.hero .when { font-family: var(--f-mono); font-size: 14px; color: var(--hero-2); margin-top: 6px; }
+.hero .then { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--hero-2); margin-top: auto; }
+.hero .then b { color: var(--hero-ink); font-weight: 500; }
+.hero .rolled { font-size: 12.5px; background: rgba(255,255,255,.1); border-radius: 8px; padding: 4px 10px; align-self: flex-start; }
+.b3row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line2); }
+.b3row:last-of-type { border-bottom: 0; }
+.b3row .rank { font: 500 20px var(--f-mono); color: var(--accent); width: 18px; }
+.b3row .txt { flex: 1; font-size: 15.5px; font-weight: 500; min-width: 0; }
+.b3row.done .rank, .b3row.done .txt { color: var(--ink-4); }
+.b3row.done .txt { text-decoration: line-through; font-weight: 400; }
+.daydone { color: var(--good); font-weight: 600; padding-top: 8px; }
+.pickhint { color: var(--ink-2); background: var(--warn-soft); border-radius: 10px; padding: 10px 14px; }
+.tick { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--ink-4); background: transparent; padding: 0; display: grid; place-items: center; flex: none; }
+.tick:hover { border-color: var(--good); }
+.tick svg { width: 12px; height: 12px; opacity: 0; }
+.tick.on { background: var(--good); border-color: var(--good); }
+.tick.on svg { opacity: 1; }
+.tick.dropped { border-style: dashed; }
+.xbtn { border: 0; background: transparent; color: var(--ink-4); font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+.xbtn:hover { color: var(--bad); background: var(--sunk); }
+
+.tl { position: relative; min-width: 720px; }
+.tl .track { position: absolute; left: 0; right: 0; top: 22px; bottom: 6px; border-radius: 10px; background: var(--sunk); }
+.tl .hr { position: absolute; top: 0; font: 11px var(--f-mono); color: var(--ink-3); transform: translateX(-50%); }
+.tl .it { position: absolute; border-radius: 8px; padding: 5px 8px; box-sizing: border-box; overflow: hidden; font-size: 12px; line-height: 1.3; }
+.tl .it b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl .it span { font: 10.5px var(--f-mono); white-space: nowrap; opacity: .75; }
+.it.evt { background: var(--evt-bg); color: var(--evt-ink); border: 1px solid var(--evt-line); }
+.it.cls { background: var(--cls); color: var(--ink-2); }
+.it.blk { background: var(--accent-soft); color: var(--accent-ink); border: 1.5px dashed var(--accent); }
+.it.past { opacity: .42; }
+.it.noend { border: 1.5px dashed var(--ink-4); }
+.tl .nowl { position: absolute; top: 14px; bottom: 0; width: 2px; background: var(--now); border-radius: 1px; z-index: 2; box-shadow: 0 0 8px var(--now); }
+.tl .nowt { position: absolute; bottom: -16px; transform: translateX(-50%); font: 500 10.5px var(--f-mono); color: var(--now); }
+.scrollx { overflow-x: auto; }
+
+.task { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--line2); }
+.task:last-child { border-bottom: 0; }
+.task .body { flex: 1; min-width: 0; }
+.task .t { overflow: hidden; text-overflow: ellipsis; }
+.task.done .t, .task.dropped .t { text-decoration: line-through; color: var(--ink-4); }
+.task .meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--ink-3); margin-top: 1px; }
+.task .meta .swatch { width: 6px; height: 6px; }
+.task .when { font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+.task .when.late { color: var(--warn); font-weight: 500; }
+.est { border: 1px solid transparent; background: transparent; font: 12px var(--f-mono); color: var(--ink-3); min-width: 46px; text-align: center; padding: 1px 6px; border-radius: 999px; }
+.est.guess { color: var(--ink-4); border: 1px dashed var(--line); }
+.est:hover { color: var(--accent); background: var(--accent-soft); }
+.star { border: 0; background: transparent; color: var(--ink-4); padding: 0 2px; font-size: 16px; line-height: 1; }
+.star:hover, .star.on { color: var(--accent); }
+.tasklist { max-height: 470px; overflow-y: auto; margin-right: -8px; padding-right: 8px; }
+.tfoot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--line2); font-size: 12.5px; color: var(--ink-3); }
+.yes { background: var(--warn-soft); border: 1px solid var(--warn-line); border-radius: 16px; padding: 18px 22px; }
+.yes .h { color: var(--warn); }
+.yes .item { padding: 9px 0; border-bottom: 1px solid var(--warn-line); }
+.yes .item:last-of-type { border-bottom: 0; }
+
+/* Goals */
+.mandala { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.mcell { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; min-height: 128px; display: flex; flex-direction: column; gap: 6px; backdrop-filter: var(--blur); position: relative; overflow: hidden; }
+.mcell .glow { position: absolute; inset: auto -40px -60px auto; width: 160px; height: 160px; border-radius: 50%; opacity: .14; filter: blur(30px); pointer-events: none; }
+.mcell b { font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.mcell .tr { font-size: 12.5px; color: var(--ink-3); }
+.mcell .st { font-size: 12.5px; color: var(--ink-2); margin-top: auto; }
+.mcell.center { background: var(--hero-bg); border-color: var(--hero-line); color: var(--hero-ink); justify-content: center; text-align: center; align-items: center; }
+.mcell.center .kicker { color: var(--hero-2); }
+.mcell.center .cg { font: 600 20px/1.25 var(--f-head); letter-spacing: -0.01em; text-wrap: balance; }
+.wrow { display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(200px, 1.6fr) 150px repeat(3, 58px) 84px; gap: 16px; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--line2); }
+.wrow:last-child { border-bottom: 0; }
+.wrow.head { font-size: 11.5px; color: var(--ink-3); padding: 0 0 6px; border-bottom: 1px solid var(--line); }
+.wrow .gt { font-weight: 600; display: flex; align-items: center; gap: 9px; }
+.wrow .tr { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+.wrow .gk b { font: 500 15px var(--f-mono); display: block; }
+.wrow .gk span { font-size: 11px; color: var(--ink-3); }
+.dots { display: flex; gap: 6px; }
+.dots span { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; font: 600 8.5px var(--f-body); color: var(--ink-4); }
+.dots span.on { border-color: transparent; color: #fff; }
+.dots span.today { outline: 1.5px solid var(--accent); outline-offset: 1.5px; }
+.verdict { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; text-align: center; white-space: nowrap; }
+.verdict.on { background: var(--good-soft); color: var(--good); }
+.verdict.behind { background: var(--warn-soft); color: var(--warn); }
+.verdict.none { background: var(--sunk); color: var(--ink-3); }
+.stats { display: flex; gap: 28px; flex-wrap: wrap; }
+.stats b { font: 600 26px var(--f-mono); display: block; letter-spacing: -0.02em; }
+.stats span { color: var(--ink-3); font-size: 12.5px; }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.mbox { border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; }
+
+/* Work */
+.board { overflow-x: auto; margin: 0 -28px; padding: 0 28px 6px; }
+.cols { display: flex; gap: 12px; align-items: flex-start; min-width: max-content; }
+.col { flex: 0 0 250px; display: flex; flex-direction: column; gap: 10px; background: var(--sunk); border-radius: 16px; padding: 12px; min-height: 120px; transition: background .15s; }
+.col.over { background: var(--accent-soft); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.col .ch { display: flex; align-items: center; gap: 8px; padding: 2px 4px 4px; font-weight: 600; font-size: 13px; }
+.col.zero .ch { color: var(--ink-4); }
+.col.closed { flex-basis: 210px; opacity: .75; }
+.fcard { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; display: flex; flex-direction: column; gap: 8px; cursor: grab; }
+.fcard:active { cursor: grabbing; }
+.fcard.dragging { opacity: .4; }
+.fcard .ft { font-weight: 600; display: flex; gap: 8px; align-items: flex-start; }
+.fcard .ft > span:first-child { flex: 1; min-width: 0; }
+.dl { font-size: 11.5px; font-weight: 500; color: var(--accent-ink); background: var(--accent-soft); border-radius: 6px; padding: 2px 7px; white-space: nowrap; }
+.fcard .nx { font-size: 13px; color: var(--ink-2); }
+.fcard .fm { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.fcard select, .prow select { font-size: 12px; border: 1px solid var(--line); background: transparent; border-radius: 6px; padding: 1px 4px; color: var(--ink-3); max-width: 100px; }
+.mini { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; }
+.mini .tick { width: 16px; height: 16px; border-radius: 5px; }
+.mini .tick svg { width: 9px; height: 9px; }
+.mini span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drop { border: 1.5px dashed var(--line); border-radius: 14px; height: 70px; display: grid; place-items: center; color: var(--ink-4); font-size: 12.5px; }
+.prow { padding: 14px 0; border-bottom: 1px solid var(--line2); }
+.prow:last-child { border-bottom: 0; }
+.prow.child { padding-left: 22px; }
+.prow .top1 { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.prow .top1 b { font-weight: 600; }
+.prow .sm { font-size: 12.5px; color: var(--ink-3); }
+.prow .tasks { margin-top: 6px; padding-left: 20px; display: grid; gap: 2px; max-width: 760px; }
+
+/* People: the zoomable sky */
+.sky { flex: 999 1 640px; min-width: 0; position: relative; height: 680px; border-radius: 20px; overflow: hidden; background: #05060B; border: 1px solid rgba(143,160,255,.18); box-shadow: 0 0 60px rgba(88,108,255,.08); }
+.skyhost { position: absolute; inset: 0; }
+.skyhost canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
+.skyhost canvas:focus-visible { box-shadow: inset 0 0 0 2px #8FA0FF; }
+.skyui { position: absolute; z-index: 2; color: #D7DBEA; }
+.skyui button { color: inherit; }
+.crumbs { top: 14px; left: 16px; right: 220px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 13px; pointer-events: none; }
+.crumbs button { pointer-events: auto; border: 0; background: rgba(255,255,255,.06); border-radius: 999px; padding: 4px 11px; display: inline-flex; align-items: center; gap: 7px; backdrop-filter: blur(6px); }
+.crumbs button:hover { background: rgba(255,255,255,.14); }
+.crumbs button[aria-current="true"] { background: rgba(255,255,255,.9); color: #0A0D1C; font-weight: 600; }
+.crumbs .sep { color: #5C6480; }
+.skychips { top: 52px; left: 16px; right: 16px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.skychips button { pointer-events: auto; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); border-radius: 999px; padding: 3px 10px; font-size: 12px; display: inline-flex; align-items: center; gap: 6px; backdrop-filter: blur(6px); }
+.skychips button[aria-pressed="true"] { background: rgba(255,255,255,.9); color: #0A0D1C; }
+.skychips .num { opacity: .6; }
+.zoomui { top: 14px; right: 14px; display: flex; flex-direction: column; gap: 4px; }
+.zoomui button { width: 34px; height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(10,13,28,.6); font-size: 17px; line-height: 1; backdrop-filter: blur(6px); }
+.zoomui button:hover { background: rgba(143,160,255,.25); }
+.minimap { right: 14px; bottom: 14px; width: 168px; height: 118px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); background: rgba(5,6,11,.75); cursor: crosshair; backdrop-filter: blur(6px); }
+.skylegend { left: 16px; bottom: 12px; right: 200px; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 11.5px; color: #A9AEC4; pointer-events: none; }
+.skylegend span { display: inline-flex; align-items: center; gap: 7px; }
+.skylegend .hint { color: #7D86A6; width: 100%; }
+.skymsg { position: absolute; inset: 0; display: grid; place-items: center; color: #A9AEC4; z-index: 1; text-align: center; padding: 20px; }
+.levelpill { top: 14px; right: 60px; font: 500 11px var(--f-mono); color: #7D86A6; padding: 6px 4px; pointer-events: none; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 12px; min-width: 260px; color: var(--ink-3); }
+.search input { border: 0; outline: 0; background: transparent; flex: 1; min-width: 0; color: var(--ink); }
+.pcard { flex: 1 1 320px; min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px; display: flex; flex-direction: column; gap: 16px; max-height: 680px; overflow: auto; backdrop-filter: var(--blur); }
+.pcard .pname { font: 600 26px/1.15 var(--f-head); letter-spacing: -0.02em; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tiles div { background: var(--sunk); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.tiles span { font-size: 11.5px; color: var(--ink-3); display: block; }
+.tiles b { font-weight: 600; display: block; margin-top: 2px; font-size: 13.5px; }
+.sec h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.kvl { display: grid; grid-template-columns: 92px 1fr; gap: 5px 12px; font-size: 13px; margin: 0; }
+.kvl dt { color: var(--ink-3); } .kvl dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.copy { border: 1px solid var(--line); background: transparent; border-radius: 6px; font-size: 11.5px; padding: 0 6px; margin-left: 6px; color: var(--ink-2); }
+.tline div { display: grid; grid-template-columns: 58px 70px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line2); font-size: 12.5px; }
+.cold { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.coldc { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 13px 16px; text-align: left; display: flex; align-items: center; gap: 12px; }
+.coldc:hover { border-color: var(--accent); }
+.coldc .av { width: 30px; height: 30px; border-radius: 50%; flex: none; opacity: .3; }
+.coldc b { display: block; font-weight: 600; }
+.coldc small { display: block; color: var(--ink-3); font-size: 12.5px; }
+
+/* Plan */
+.wkhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.util { display: flex; gap: 20px; font-size: 13px; color: var(--ink-2); flex-wrap: wrap; }
+.util b { font: 500 13px var(--f-mono); color: var(--ink); }
+.gridwrap { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: auto; height: calc(100vh - 220px); min-height: 460px; }
+.wk { display: grid; grid-template-columns: 50px repeat(7, minmax(120px, 1fr)); min-width: 920px; position: relative; }
+.wk .dh { position: sticky; top: 0; z-index: 3; background: var(--panel); backdrop-filter: blur(12px); border-bottom: 1px solid var(--line); border-left: 1px solid var(--line2); padding: 10px 10px 9px; }
+:root[data-theme="dark"] .wk .dh, :root[data-theme="dark"] .hours, :root[data-theme="dark"] .wk .corner { background: #0C1022; }
+.wk .dh b { font-weight: 600; } .wk .dh.today b { color: var(--accent); }
+.wk .dh .load { height: 4px; border-radius: 2px; background: var(--sunk); margin-top: 7px; overflow: hidden; }
+.wk .dh .load i { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+.wk .dh small { font-size: 11px; color: var(--ink-3); display: block; margin-top: 3px; }
+.wk .corner { position: sticky; top: 0; left: 0; z-index: 4; background: var(--panel); border-bottom: 1px solid var(--line); }
+.hours { position: sticky; left: 0; z-index: 2; background: var(--panel); }
+.hours div { height: 40px; font: 10.5px var(--f-mono); color: var(--ink-4); text-align: right; padding-right: 8px; transform: translateY(-7px); }
+.daycol { position: relative; border-left: 1px solid var(--line2); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, var(--line2) 39px, var(--line2) 40px); height: 960px; }
+.daycol.picking { cursor: copy; } .daycol.picking:hover, .daycol.dropping { background-color: var(--accent-soft); }
+.wk .item { position: absolute; left: 4px; right: 4px; border-radius: 8px; padding: 4px 7px; font-size: 11.5px; line-height: 1.3; overflow: hidden; box-sizing: border-box; }
+.wk .item b { font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wk .item .tm { font: 10.5px var(--f-mono); opacity: .75; }
+.wk .item.event { background: var(--evt-bg); color: var(--evt-ink); border: 1px solid var(--evt-line); }
+.wk .item.cls { background: var(--cls); color: var(--ink-2); }
+.wk .item.noend { border: 1.5px dashed var(--ink-4); }
+.wk .item.block { background: var(--accent-soft); color: var(--accent-ink); border: 1.5px dashed var(--accent); cursor: pointer; }
+.wk .item.block.actual { border-style: solid; }
+.wk .nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--now); z-index: 2; box-shadow: 0 0 8px var(--now); }
+.wk .ghost { position: absolute; left: 4px; right: 4px; border-radius: 8px; border: 1.5px dashed var(--accent); background: var(--accent-soft); pointer-events: none; z-index: 3; font: 10.5px var(--f-mono); color: var(--accent-ink); padding: 3px 6px; }
+.backlog { display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 290px); overflow: auto; }
+.bl { display: flex; gap: 10px; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; text-align: left; width: 100%; cursor: grab; }
+.bl:hover { border-color: var(--accent); }
+.bl[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.bl .b { flex: 1; min-width: 0; }
+.bl .b div { font-weight: 500; font-size: 13.5px; }
+.bl .b small { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--ink-3); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* Health */
+table.t { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.t th { text-align: left; color: var(--ink-3); font-weight: 500; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+table.t td { padding: 7px 8px; border-bottom: 1px solid var(--line2); vertical-align: top; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); background: #17181C; color: #F5F4F0; border: 1px solid rgba(143,160,255,.25); border-radius: 10px; padding: 9px 16px; display: flex; gap: 14px; align-items: center; z-index: 20; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+.toast button { background: transparent; border: 0; color: #AFC0FF; font-weight: 600; }
+.pop { position: fixed; z-index: 30; background: var(--panel); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: 0 10px 32px rgba(0,0,0,.25); max-width: 300px; }
+:root[data-theme="dark"] .pop { background: #121731; }
+.pop .row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pop input { width: 80px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: transparent; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 1000px) {
+  .wrow { grid-template-columns: 1fr 1fr; } .wrow.head { display: none; } .wrow .gk { display: none; }
+}
+@media (max-width: 640px) {
+  .hero .what { font-size: 26px; }
+  .search { min-width: 0; flex: 1; }
+  .sky { height: 520px; }
+  .minimap, .skylegend { display: none; }
+  .mandala { gap: 6px; } .mcell { padding: 10px; min-height: 96px; } .mcell .tr { display: none; }
+  .gridwrap { height: 70vh; }
+}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><b>Desk</b><span class="day" id="dayLabel"></span></div>
+  <nav class="tabs" aria-label="Screens">
+    <a href="#today">Today</a><a href="#plan">Plan</a><a href="#goals">Goals</a><a href="#work">Work</a><a href="#people">People</a><a href="#diary">Diary</a><a href="#trust">Health</a>
+  </nav>
+  <span class="spacer"></span>
+  <a class="sync" id="sync" href="#trust" title="Brain health"><i class="dot warn"></i><span>Waiting for the brain</span></a>
+  <button class="iconbtn" id="themeBtn" type="button" title="Theme">Theme</button>
+  <button class="iconbtn" id="tokenBtn" type="button" hidden>Token</button>
+  <button class="iconbtn" id="refresh" type="button" title="Reload from the brain">Refresh</button>
+</header>
+<main id="main"><div class="notice"><b>Connecting to your brain</b>Loading today from the Second Brain connector.</div></main>
+
+<script>
+'use strict';
+const SERVER = 'Second Brain';
+const TZ = 'America/New_York';
+const STAGES = ['researching', 'networking', 'applied', 'test', 'first round', 'final round', 'offer', 'closed'];
+const BOX_ORDER = ['career', 'wealth', 'social', 'party', 'unique', 'body', 'together', 'impact'];
+const BOX_HEX = { career: '#8FA0FF', wealth: '#D9B44A', social: '#EC7FA4', party: '#B197FC', unique: '#4FC3D4', body: '#F59F5A', together: '#9FB0C6', impact: '#5FCF92', other: '#8C93A8' };
+const SCREENS = ['today', 'plan', 'goals', 'work', 'people', 'diary', 'trust'];
+const ALIAS = { mirror: 'goals', health: 'trust' };
+const NOW_CAP = 8, VIEW_TIMEOUT = 25000, MAX_ORGS = 40;
+let MCP = null;
+const S = { control: null, goals: null, work: null, sky: null, net: null, netAt: 0, person: null, personId: null,
+  week: null, weekStart: null, review: null, reviewMonth: null, trust: null, diary: null, diaryMonth: null, diaryQ: '', diaryEdit: null, pick: null, drag: null, updated: null, err: {},
+  ui: { bucket: 'now', pursuit: null, showAll: false, org: null, q: '' } };
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = (iso, o) => new Intl.DateTimeFormat('en-US', { timeZone: TZ, ...o }).format(new Date(iso));
+const tme = (iso) => fmt(iso, { hour: 'numeric', minute: '2-digit' });
+const ymd = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d);
+const dayName = (s) => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', timeZone: 'UTC' });
+const shortDate = (s) => s ? new Date(String(s).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '';
+const addDays = (s, n) => { const d = new Date(s + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const mondayOf = (s) => { const wd = new Date(s + 'T12:00:00Z').getUTCDay(); return addDays(s, -((wd + 6) % 7)); };
+const daysAgo = (iso) => { if (!iso) return null; return Math.floor((Date.now() - new Date(iso).getTime()) / 864e5); };
+const ago = (iso) => { const d = daysAgo(iso); return d == null ? 'never' : d <= 0 ? 'today' : d === 1 ? 'yesterday' : d + ' days ago'; };
+const shortAgo = (iso) => { const d = daysAgo(iso); return d == null ? 'no activity' : d <= 0 ? 'today' : d + 'd ago'; };
+const dueIn = (due) => due ? Math.round((new Date(String(due).slice(0, 10) + 'T12:00:00Z') - new Date(ymd(new Date()) + 'T12:00:00Z')) / 864e5) : null;
+const boxKey = (gid) => { const m = /^(?:box|action):([a-z]+)/.exec(gid || ''); return m ? m[1] : null; };
+const boxColor = (k) => k ? `var(--b-${k})` : 'var(--ink-4)';
+const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : '';
+const nyMinutes = (iso) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(iso)).map(x => [x.type, x.value])); return (+p.hour) * 60 + (+p.minute); };
+function nyIso(dateStr, minutes) { // wall time in New York -> ISO with the right offset
+  const guess = new Date(dateStr + 'T00:00:00Z').getTime() + minutes * 60000;
+  const off = (t) => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(new Date(t)).map(x => [x.type, x.value])); return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - t; };
+  let t = guess - off(guess); t = guess - off(t); return new Date(t).toISOString();
+}
+const fmtMin = (m) => m >= 60 ? (m % 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m / 60}h`) : `${m}m`;
+const inMin = (m) => m < 60 ? `${m} min` : fmtMin(Math.round(m / 5) * 5);
+const CHECK = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SEARCH_ICON = '<svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+const GRIP = '<svg width="10" height="16" viewBox="0 0 10 16" aria-hidden="true" style="flex:none;margin-top:2px"><g fill="var(--ink-4)"><circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/><circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/><circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/></g></svg>';
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, a)).toFixed(3)})`; }
+function mix(hex, t) { const n = parseInt(hex.slice(1), 16); const f = (c) => Math.round(c + (255 - c) * t); return '#' + [f((n >> 16) & 255), f((n >> 8) & 255), f(n & 255)].map(v => v.toString(16).padStart(2, '0')).join(''); }
+
+// ── Theme ──────────────────────────────────────────────────────────────────────────────────────────
+const store = { get: (k) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { /* storage off */ } } };
+function applyTheme() {
+  const p = document.documentElement.dataset.pref || 'auto';
+  const dark = p === 'dark' || (p === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  $('#themeBtn').textContent = { auto: 'Theme: auto', dark: 'Theme: space', light: 'Theme: light' }[p];
+}
+(function stars() { // a tiled starfield for the space theme background
+  let seed = 11; const r = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  let c = ''; for (let i = 0; i < 110; i++) c += `<circle cx="${(r() * 640).toFixed(1)}" cy="${(r() * 640).toFixed(1)}" r="${(0.3 + r() * 0.9).toFixed(2)}" fill="#fff" fill-opacity="${(0.15 + r() * 0.55).toFixed(2)}"/>`;
+  document.documentElement.style.setProperty('--stars', `url("data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='640' height='640'>${c}</svg>`)}")`);
+})();
+$('#themeBtn').onclick = () => { const order = ['auto', 'dark', 'light']; const p = order[(order.indexOf(document.documentElement.dataset.pref || 'auto') + 1) % 3]; document.documentElement.dataset.pref = p; store.set('desk_theme', p === 'auto' ? '' : p); applyTheme(); };
+window.matchMedia && matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyTheme);
+applyTheme();
+
+// ── Connector: two modes ───────────────────────────────────────────────────────────────────────────
+const FIX = {
+  needs_reauth: 'Reconnect the Second Brain connector in claude.ai Settings, Connectors, then press Refresh.',
+  server_not_connected: 'Add the Second Brain connector in claude.ai Settings, Connectors, then press Refresh.',
+  selection_required: 'Choose which Second Brain connector this page should use, then press Refresh.',
+  not_in_manifest: 'This page is not allowed to use that part of the Second Brain connector. Allow it in the page permissions, then press Refresh.',
+  approval_required: 'This page needs your OK to use the Second Brain connector. Press Refresh and choose Allow.',
+  not_granted: 'This page was not given access to connectors in this view. Open it in claude.ai.',
+  capability_disabled: 'Connectors are not available in this view. Open the page in claude.ai.',
+};
+function errText(e) {
+  if (e?.code === 'bad_token' || e?.code === 'no_token') return 'The brain did not accept the token. Use Token in the top bar to enter it again.';
+  if (e?.code === 'offline') return 'Could not reach the brain. Check the internet connection; the desk retries every minute.';
+  if (e?.code === 'tool_error') return 'The brain answered with an error: ' + String(e.message ?? '').slice(0, 160);
+  if (e?.code === 'server_unavailable') return 'The brain did not answer in time. Press Refresh in a moment.';
+  return FIX[e?.code] ?? ('Could not reach the brain: ' + String(e?.message ?? e).slice(0, 160));
+}
+// Outside Claude (the page opened as a file or from any web host) it talks to the brain's desk endpoint with
+// the connector token, kept only in this browser.
+const DESK_API = 'https://<your-project-ref>.supabase.co/functions/v1/desk';
+const cleanToken = (v) => String(v ?? '').trim().replace(/^.*\//, '').replace(/[?#].*$/, '');
+let TOKEN = cleanToken(store.get('brain_token'));
+const OP_FOR = { update_task: 'update_task', mark_commitment: 'mark', set_priorities: 'set_priorities', update_pursuit: 'update_pursuit', plan_block: 'plan_block', delete_block: 'delete_block', edit_diary: 'edit_diary' };
+const withTimeout = (p) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej({ code: 'server_unavailable' }), VIEW_TIMEOUT))]);
+async function direct(method, query, body) {
+  if (!TOKEN) throw { code: 'no_token' };
+  let r;
+  try { r = await withTimeout(fetch(DESK_API + (query ? '?' + new URLSearchParams(query) : ''), { method, cache: 'no-store',
+    headers: { 'x-brain-token': TOKEN, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })); }
+  catch (e) { if (e?.code) throw e; throw { code: 'offline', message: String(e?.message ?? e) }; }
+  if (r.status === 404) throw { code: 'bad_token' };
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw { code: 'tool_error', message: j?.error ?? ('HTTP ' + r.status) };
+  return j;
+}
+async function view(name, args = {}) {
+  if (!MCP) return direct('GET', { view: name, ...Object.fromEntries(Object.entries(args).filter(([, v]) => v != null)) });
+  const res = await withTimeout(MCP.callTool(SERVER, 'get_desk', { view: name, ...args }, { cache: false }));
+  const p = typeof res.payload === 'string' ? JSON.parse(res.payload) : res.payload;
+  if (p == null || typeof p !== 'object') throw { code: 'tool_error', message: 'Unexpected reply for ' + name };
+  return p;
+}
+async function act(tool, input) {
+  if (!MCP) {
+    const b = { op: OP_FOR[tool], ...input };
+    if (tool === 'mark_commitment') { b.id = input.commitment_id; delete b.commitment_id; }
+    return direct('POST', null, b);
+  }
+  const res = await withTimeout(MCP.callTool(SERVER, tool, input, { cache: false }));
+  return typeof res.payload === 'string' ? (() => { try { return JSON.parse(res.payload); } catch { return res.payload; } })() : res.payload;
+}
+function newToolMissing(e) { return e?.code === 'not_in_manifest' || /unknown tool/i.test(String(e?.message ?? '')); }
+const needsUpdate = (what) => (e) => toast(newToolMissing(e) ? what + ' here needs the updated connector. Reconnect Second Brain in Settings, Connectors.' : errText(e));
+
+// ── Toast and popover ──────────────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, undo) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status');
+  t.innerHTML = `<span>${esc(msg)}</span>` + (undo ? '<button type="button">Undo</button>' : '');
+  if (undo) t.querySelector('button').onclick = () => { t.remove(); undo(); };
+  document.body.appendChild(t); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), undo ? 7000 : 4000);
+}
+function closePop() { document.querySelectorAll('.pop').forEach(p => p.remove()); }
+function placePop(p, el, h) { const r = el.getBoundingClientRect(); p.style.left = Math.max(8, Math.min(window.innerWidth - 310, r.left)) + 'px'; p.style.top = Math.min(window.innerHeight - h, r.bottom + 6) + 'px'; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closePop(); if (S.pick) { S.pick = null; render(); } } });
+document.addEventListener('click', e => { if (!e.target.closest('.pop') && !e.target.closest('[data-pop]')) closePop(); });
+
+// ── Loading ────────────────────────────────────────────────────────────────────────────────────────
+function screen() { let h = location.hash.replace('#', ''); h = ALIAS[h] ?? h; return SCREENS.includes(h) ? h : 'today'; }
+async function load(which = screen(), quiet = false) {
+  try {
+    if (which === 'today') {
+      const [c, g] = await Promise.all([view('control'), view('goals')]); S.control = c; S.goals = g;
+      background();
+    }
+    if (which === 'goals') { const [g, r] = await Promise.all([view('goals'), view('review', S.reviewMonth ? { month: S.reviewMonth } : {}).catch(e => { S.err.review = e; return null; })]); S.goals = g; S.review = r; }
+    if (which === 'work') S.work = await view('workbench');
+    if (which === 'people') { await loadNetwork(); if (S.personId) S.person = await view('person', { id: S.personId }); }
+    if (which === 'plan') S.week = await view('week', S.weekStart ? { week_start: S.weekStart } : {});
+    if (which === 'trust') S.trust = await view('trust');
+    if (which === 'diary') S.diary = await view('diary', S.diaryQ ? { q: S.diaryQ } : S.diaryMonth ? { month: S.diaryMonth } : {});
+    if (which !== 'today') S.control = await view('control');   // header date and sync pill stay current on every screen
+    S.err[which] = null; S.updated = new Date();
+  } catch (e) { S.err[which] = e; if (!quiet) console.warn(e); }
+  render();
+}
+// Today also shows planned blocks, deadlines and people, which live in other views: fetch them quietly.
+function background() {
+  const again = () => { if (screen() === 'today') render(); };
+  if (!S.weekStart) view('week').then(w => { S.week = w; again(); }).catch(() => {});
+  if (!S.work) view('workbench').then(w => { S.work = w; again(); }).catch(() => {});
+  if (!S.net || Date.now() - S.netAt > 10 * 6e4) loadNetwork().then(again).catch(() => {});
+}
+// The constellation needs every organisation's people and links: fetch them six at a time.
+async function loadNetwork() {
+  const sky = await view('people'); S.sky = sky;
+  if (!S.work) S.work = await view('workbench').catch(() => null);
+  if (!S.goals) S.goals = await view('goals').catch(() => null);
+  const orgs = [...sky.orgs].sort((a, b) => (b.people ?? 0) - (a.people ?? 0)).slice(0, MAX_ORGS);
+  const got = new Array(orgs.length); let next = 0;
+  await Promise.all([...Array(Math.min(6, orgs.length))].map(async () => { while (next < orgs.length) { const i = next++; try { got[i] = await view('people', { org: orgs[i].id }); } catch { got[i] = null; } } }));
+  const nodes = new Map(), links = new Map(), outOrgs = [];
+  got.forEach((g, i) => {
+    if (!g?.people) return;
+    const o = { id: orgs[i].id, name: orgs[i].name, n: 0 }; outOrgs.push(o);
+    for (const p of g.people) { if (nodes.has(p.id)) continue; nodes.set(p.id, { id: p.id, name: p.name, org: o.id, last: p.last_contact ?? null, owe: !!p.i_owe, owes: !!p.owes_me }); o.n++; }
+    for (const l of g.links ?? []) links.set([l.a, l.b].sort().join('|'), { a: l.a, b: l.b });
+  });
+  const ls = [...links.values()].filter(l => nodes.has(l.a) && nodes.has(l.b) && l.a !== l.b);
+  const deg = new Map(); ls.forEach(l => { deg.set(l.a, (deg.get(l.a) ?? 0) + 1); deg.set(l.b, (deg.get(l.b) ?? 0) + 1); });
+  for (const n of nodes.values()) n.deg = deg.get(n.id) ?? 0;
+  S.net = { orgs: outOrgs.filter(o => o.n), nodes: [...nodes.values()], links: ls, skipped: Math.max(0, sky.orgs.length - orgs.length) };
+  S.netAt = Date.now();
+}
+
+// ── Shared task bits ───────────────────────────────────────────────────────────────────────────────
+function whenOf(t) {
+  const d = dueIn(t.due);
+  if (t.overdue || (d != null && d < 0)) return { txt: d == null ? 'overdue' : d === -1 ? 'yesterday' : `${-d} days late`, late: true };
+  if (d == null) return { txt: '', late: false };
+  if (d === 0) return { txt: 'today', late: false };
+  if (d === 1) return { txt: 'tomorrow', late: false };
+  if (d < 7) return { txt: new Date(String(t.due).slice(0, 10) + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }), late: false };
+  return { txt: shortDate(t.due), late: false };
+}
+const isUnfiled = (t) => !t.pursuit && !boxKey(t.goal_id);
+function bucketOf(t) {
+  if (isUnfiled(t)) return 'unfiled';
+  const d = dueIn(t.due);
+  if (t.overdue || (d != null && d <= 2)) return 'now';
+  if (t.estimate_min != null && t.estimate_source !== 'default' && t.estimate_min <= 10) return 'now';
+  return 'later';
+}
+const pursuitOf = (t) => t.pursuit ?? (boxKey(t.goal_id) ? cap(boxKey(t.goal_id)) : 'Unfiled');
+const estChip = (c) => c.estimate_min != null ? `<button class="est ${c.estimate_source === 'default' ? 'guess' : ''}" type="button" data-est="${c.id}" data-pop="1" title="${c.estimate_source === 'default' ? 'Default estimate, click to set' : 'Click to change the estimate'}">${fmtMin(c.estimate_min)}</button>` : `<button class="est guess" type="button" data-est="${c.id}" data-pop="1" title="Set an estimate">+ time</button>`;
+function taskRow(c, big3ids = S.control?.big3.map(b => b.id) ?? []) {
+  const st = c.status; const closed = st === 'done' || st === 'dropped'; const w = whenOf(c); const on = big3ids.includes(c.id);
+  const flags = [st === 'needs_review' ? '<span class="flag">check: a fact changed</span>' : '', st === 'unknown' ? '<span class="flag">still on?</span>' : '',
+    c.for_name ? `<span>for ${esc(c.for_name)}</span>` : '', c.is_event ? '<span>event</span>' : '', st === 'dropped' ? '<span>dropped</span>' : ''].join('');
+  return `<div class="task ${st === 'done' ? 'done' : ''} ${st === 'dropped' ? 'dropped' : ''}">
+    <button class="tick ${st === 'done' ? 'on' : ''} ${st === 'dropped' ? 'dropped' : ''}" type="button" data-tick="${c.id}" aria-label="${closed ? 'Reopen' : 'Mark done'}: ${esc(c.action)}">${CHECK}</button>
+    <div class="body"><div class="t">${esc(c.action)}</div><div class="meta"><span class="swatch" style="background:${boxColor(boxKey(c.goal_id))}"></span>${esc(pursuitOf(c))}${flags}</div></div>
+    <span class="when ${w.late ? 'late' : ''}">${esc(w.txt)}</span>
+    ${closed ? '' : estChip(c)}
+    ${closed ? '' : `<button class="xbtn" type="button" data-drop="${c.id}" aria-label="Drop: ${esc(c.action)}" title="Drop this task">×</button>`}
+    <button class="star ${on ? 'on' : ''}" type="button" data-star="${c.id}" title="${on ? 'Remove from Big 3' : 'Add to Big 3'}" aria-label="${on ? 'Remove from Big 3' : 'Add to Big 3'}">${on ? '★' : '☆'}</button>
+  </div>`;
+}
+const miniTask = (c) => `<div class="mini"><button class="tick ${c.status === 'done' ? 'on' : ''}" type="button" data-tick="${c.id}" aria-label="Mark done: ${esc(c.action)}">${CHECK}</button><span>${esc(c.action)}</span>${(() => { const w = whenOf(c); return w.txt ? `<small class="${w.late ? 'flag' : 'muted'}">${esc(w.txt)}</small>` : ''; })()}</div>`;
+
+// ── Today ──────────────────────────────────────────────────────────────────────────────────────────
+function dayItems(c) {
+  const evs = c.events.map(e => ({ ...e, clash: e.clashes_with, kind: e.is_class ? 'cls' : 'evt' }));
+  const bl = (S.week?.blocks ?? []).filter(b => ymd(new Date(b.start)) === c.mode.day).map(b => ({ start: b.start, end: b.end, end_known: true, title: b.title ?? 'Block', kind: 'blk' }));
+  return [...evs, ...bl].sort((a, b) => new Date(a.start) - new Date(b.start));
+}
+function heroHtml(c, items) {
+  const now = Date.now(); const rolled = c.mode.rolled_to_tomorrow;
+  const endOf = (i) => i.end_known === false || !i.end ? new Date(i.start).getTime() + 36e5 : new Date(i.end).getTime();
+  const cur = rolled ? null : items.find(i => new Date(i.start) <= now && endOf(i) > now);
+  const upcoming = items.filter(i => rolled || new Date(i.start) > now);
+  const main = cur ?? upcoming[0]; const then = cur ? upcoming[0] : upcoming[1];
+  const kind = (i) => i.kind === 'blk' ? 'planned block' : i.kind === 'cls' ? 'class' : (i.location || '');
+  if (!main) return `<div class="hero"><div class="lab">${rolled ? 'Tomorrow' : 'Rest of today'}</div><div class="what">Nothing else on the calendar</div><div class="when">Good time for the Big 3.</div></div>`;
+  const lab = cur ? `Now · ends in ${inMin(Math.max(1, Math.round((endOf(cur) - now) / 6e4)))}` : rolled ? 'First up tomorrow' : `Up next · in ${inMin(Math.max(1, Math.round((new Date(main.start) - now) / 6e4)))}`;
+  return `<div class="hero">${rolled ? '<span class="rolled">Today is wrapped up. Showing tomorrow.</span>' : ''}
+    <div class="lab">${lab}</div>
+    <div><div class="what">${esc(main.title)}</div><div class="when">${tme(main.start)}${main.end_known === false ? ' · end ?' : ' – ' + tme(main.end)}${kind(main) ? ' · ' + esc(kind(main)) : ''}</div></div>
+    ${main.clash ? `<div class="when" style="color:var(--warn)">Clashes with ${esc(main.clash.join(', '))}</div>` : ''}
+    ${then ? `<div class="then"><span>Then</span><b>${esc(then.title)}</b><span class="mono">${tme(then.start)}</span></div>` : ''}</div>`;
+}
+function timelineHtml(c, items) {
+  const spans = items.map(i => { const s = nyMinutes(i.start); let e = i.end_known === false || !i.end ? s + 60 : nyMinutes(i.end); if (ymd(new Date(i.end ?? i.start)) !== ymd(new Date(i.start)) || e <= s) e = 24 * 60; return { ...i, s, e }; });
+  const lo = Math.min(7 * 60, ...spans.map(x => Math.floor(x.s / 60) * 60)), hi = Math.max(23 * 60, ...spans.map(x => Math.ceil(x.e / 60) * 60));
+  const pct = (m) => ((m - lo) / (hi - lo) * 100).toFixed(3) + '%';
+  const lanes = []; for (const x of spans) { let l = lanes.findIndex(end => end <= x.s); if (l < 0) { l = lanes.length; lanes.push(0); } lanes[l] = x.e; x.lane = l; }
+  const LH = 48, H = 26 + Math.max(1, lanes.length) * LH + 6;
+  const nowM = nyMinutes(new Date().toISOString()); const isToday = c.mode.day === ymd(new Date());
+  const hrs = []; for (let m = lo + 60; m < hi; m += 120) hrs.push(`<span class="hr" style="left:${pct(m)}">${m / 60}</span>`);
+  const its = spans.map(x => `<div class="it ${x.kind} ${x.end_known === false ? 'noend' : ''} ${isToday && x.e <= nowM ? 'past' : ''}" style="left:${pct(x.s)};width:calc(${pct(x.e)} - ${pct(x.s)} - 3px);top:${26 + x.lane * LH}px;height:${LH - 6}px" title="${esc(x.title)} ${tme(x.start)}${x.end_known === false ? ' (no end time)' : '–' + tme(x.end)}${x.location ? ' · ' + esc(x.location) : ''}${x.clash ? ' · clashes with ' + esc(x.clash.join(', ')) : ''}"><b>${esc(x.title)}</b><span>${tme(x.start)}</span></div>`).join('');
+  const nowl = isToday && nowM >= lo && nowM <= hi ? `<div class="nowl" style="left:${pct(nowM)}"></div><span class="nowt" style="left:${pct(nowM)}">${tme(new Date().toISOString())}</span>` : '';
+  let busy = 0, cur = 8 * 60; for (const x of [...spans].sort((a, b) => a.s - b.s)) { const s = Math.max(x.s, cur), e = Math.min(x.e, 22 * 60); if (e > s) { busy += e - s; cur = e; } }
+  return { html: `<div class="scrollx"><div class="tl" style="height:${H}px"><div class="track"></div>${hrs.join('')}${its}${nowl}</div></div>`, free: Math.max(0, 14 * 60 - busy) };
+}
+// People on today's calendar: attendees if the calendar gives them, else known names in event titles.
+function meetingToday(c) {
+  const out = []; const seen = new Set();
+  for (const e of c.events) {
+    if (e.is_class) continue;
+    let ppl = (e.attendees ?? e.people ?? []).map(x => typeof x === 'string' ? { name: x } : { name: x.name ?? x.email, id: x.id ?? x.entity_id });
+    if (!ppl.length && S.net) { const t = String(e.title).toLowerCase(); ppl = S.net.nodes.filter(n => n.name && n.name.includes(' ') && t.includes(n.name.toLowerCase())).map(n => ({ name: n.name, id: n.id })); }
+    for (const p of ppl) { const k = p.id ?? p.name; if (!p.name || seen.has(k)) continue; seen.add(k); out.push({ ...p, event: e.title, at: e.start }); }
+  }
+  return out;
+}
+function renderToday() {
+  const c = S.control;
+  if (!c) return S.err.today ? notice(S.err.today) : loading();
+  const items = dayItems(c);
+  const big3ids = c.big3.map(b => b.id);
+  const b3 = c.big3.length ? c.big3.map(b => `<div class="b3row ${b.status === 'done' ? 'done' : ''}"><span class="rank">${b.rank}</span><span class="txt">${esc(b.action)}</span>
+      <button class="xbtn" type="button" data-star="${b.id}" title="Remove from Big 3" aria-label="Remove from Big 3: ${esc(b.action)}">☆</button>
+      <button class="tick ${b.status === 'done' ? 'on' : ''}" type="button" data-tick="${b.id}" aria-label="${b.status === 'done' ? 'Reopen' : 'Mark done'}: ${esc(b.action)}">${CHECK}</button></div>`).join('')
+    : `<div class="pickhint">No Big 3 for ${c.mode.rolled_to_tomorrow ? 'tomorrow' : 'today'} yet. Star up to three tasks below, or set them in the morning check-in.</div>`;
+  const doneN = c.big3.filter(b => b.status === 'done').length;
+  const tl = timelineHtml(c, items);
+  const nEv = items.filter(i => i.kind !== 'blk').length, nBl = items.length - nEv;
+
+  const ui = S.ui; const all = c.tasks;
+  const byB = { now: [], later: [], unfiled: [] }; all.forEach(t => byB[bucketOf(t)].push(t));
+  const pursuits = new Map(); all.filter(t => !isUnfiled(t)).forEach(t => { const k = pursuitOf(t); pursuits.set(k, (pursuits.get(k) ?? 0) + 1); });
+  if (ui.pursuit && !pursuits.has(ui.pursuit)) ui.pursuit = null;
+  const rank = (t) => [t.status === 'done' || t.status === 'dropped' ? 1 : 0, t.overdue ? 0 : 1, dueIn(t.due) ?? 999];
+  const cmp = (a, b) => { const x = rank(a), y = rank(b); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] - y[i]; return 0; };
+  let list = byB[ui.bucket].filter(t => ui.bucket === 'unfiled' || !ui.pursuit || pursuitOf(t) === ui.pursuit).sort(cmp);
+  const capOn = ui.bucket === 'now' && !ui.showAll && !ui.pursuit && list.length > NOW_CAP; const hidden = capOn ? list.length - NOW_CAP : 0;
+  if (capOn) list = list.slice(0, NOW_CAP);
+  const segs = [['now', 'Now'], ['later', 'Later'], ['unfiled', 'Unfiled']].map(([k, l]) => `<button type="button" data-bucket="${k}" aria-pressed="${ui.bucket === k}">${l}<span class="num">${byB[k].length}</span></button>`).join('');
+  const chips = ui.bucket === 'unfiled' ? '' : `<div class="chips" role="group" aria-label="Pursuit" style="margin-bottom:6px"><button class="chip" type="button" data-pf="" aria-pressed="${!ui.pursuit}">All</button>` +
+    [...pursuits.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `<button class="chip" type="button" data-pf="${esc(k)}" aria-pressed="${ui.pursuit === k}">${esc(k)} <span class="num">${n}</span></button>`).join('') + '</div>';
+  const emptyMsg = { now: 'Nothing urgent. Look in Later.', later: 'Nothing parked for later.', unfiled: 'Every task has a home.' }[ui.bucket];
+  const footTxt = { now: 'Now = overdue, due within 2 days, or a task you sized at 10 minutes or less.', later: 'Everything with a pursuit that is not urgent yet.', unfiled: 'Tasks with no pursuit or box. File them in a check-in.' }[ui.bucket];
+
+  // right rail
+  const wk = all.filter(t => t.status !== 'done' && t.status !== 'dropped' && dueIn(t.due) != null && dueIn(t.due) >= 0 && dueIn(t.due) <= 7).map(t => ({ what: t.action, due: t.due, kind: pursuitOf(t), box: boxKey(t.goal_id) }));
+  (S.work ?? []).filter(p => p.deadline && dueIn(p.deadline) != null && dueIn(p.deadline) >= 0 && dueIn(p.deadline) <= 7).forEach(p => wk.push({ what: p.title + ' deadline', due: p.deadline, kind: 'pursuit', box: boxKey(p.goal_id) }));
+  wk.sort((a, b) => dueIn(a.due) - dueIn(b.due));
+  const weekHtml = wk.slice(0, 7).map(x => `<div class="lrow"><span class="swatch" style="background:${boxColor(x.box)};width:6px;height:6px;align-self:center"></span><span style="flex:1;min-width:0">${esc(x.what)}</span><span class="mono muted" style="font-size:12px;white-space:nowrap">${esc(whenOf({ due: x.due }).txt)}</span></div>`).join('') || '<div class="empty">No deadlines in the next 7 days.</div>';
+  const meet = meetingToday(c);
+  const meetHtml = meet.map(p => `<button class="lrow click" type="button" ${p.id ? `data-goperson="${esc(p.id)}"` : ''}><b style="font-weight:500;flex:1;min-width:0">${esc(p.name)}</b><span class="muted" style="font-size:12.5px;white-space:nowrap">${esc(p.event)} · ${tme(p.at)}</span></button>`).join('') || `<div class="empty">${S.net ? 'No one you know is on today\'s calendar.' : 'Matching people to events…'}</div>`;
+  const cold = S.net ? S.net.nodes.filter(n => (daysAgo(n.last) ?? -1) > 30).sort((a, b) => new Date(a.last) - new Date(b.last)).slice(0, 4) : [];
+  const orgName = (id) => S.net?.orgs.find(o => o.id === id)?.name ?? '';
+  const coldHtml = S.net ? (cold.map(n => `<button class="lrow click" type="button" data-goperson="${esc(n.id)}"><b style="font-weight:500;flex:1;min-width:0">${esc(n.name)}</b><span class="muted" style="font-size:12.5px;white-space:nowrap">${esc(orgName(n.org))} · ${esc(shortAgo(n.last))}</span></button>`).join('') || '<div class="empty">Nobody has gone quiet for 30+ days.</div>') : '<div class="empty">Loading your network…</div>';
+  const owed = c.owed_to_me.map(o => `<div class="lrow"><span style="flex:1"><b style="font-weight:500">${esc(o.owner_name ?? o.owner)}</b> · ${esc(o.action)}</span>${o.due ? `<span class="muted" style="font-size:12.5px;white-space:nowrap">${esc(shortDate(o.due))}</span>` : ''}</div>`).join('') || '<div class="empty">Nobody owes you anything right now.</div>';
+  const yes = c.needs_yes.length ? `<section class="yes" aria-label="Needs your yes"><h2 class="h sm">Needs your yes · ${c.needs_yes.length}</h2>${c.needs_yes.map(p => `<div class="item"><div style="font-weight:500">${esc(p.title)}</div>${p.body ? `<div style="font-size:12.5px;color:var(--ink-2)">${esc(p.body)}</div>` : ''}</div>`).join('')}<div class="muted" style="font-size:12px;margin-top:6px">Answer these in the morning check-in.</div></section>` : '';
+
+  return `<div class="page">
+    <div class="goalband"><span class="kicker">Center goal</span><span class="g">${esc(S.goals?.center ?? 'No center goal yet')}</span><span class="spacer"></span><a class="sub" href="#goals">Goals</a></div>
+    <section class="top" aria-label="Now and Big 3">${heroHtml(c, items)}
+      <div class="card"><div class="chead"><h2 class="h">Big 3</h2>${c.big3.length ? `<span class="sub">${doneN} of ${c.big3.length} done</span>` : ''}</div>${b3}${c.big3.length && doneN === c.big3.length ? '<div class="daydone">Day complete. All three done.</div>' : ''}</div>
+    </section>
+    <section class="card" aria-label="Today's schedule"><div class="chead"><h2 class="h">${c.mode.rolled_to_tomorrow ? "Tomorrow's schedule" : "Today's schedule"}</h2><span class="sub">${nEv} event${nEv === 1 ? '' : 's'}${nBl ? ` · ${nBl} planned` : ''} · ${fmtMin(tl.free)} free 8–22</span><span class="spacer"></span><a class="sub" href="#plan">Plan the week</a></div>
+      ${items.length ? tl.html : '<div class="empty">Nothing on the calendar.</div>'}</section>
+    <div class="row2">
+      <section class="card grow" aria-label="Tasks" style="display:flex;flex-direction:column">
+        <div class="chead" style="align-items:center;gap:14px"><h2 class="h">Tasks</h2><div class="seg" role="group" aria-label="Bucket">${segs}</div><span class="spacer"></span>${c.overdue_count ? `<span class="flag" style="font-size:13px">${c.overdue_count} overdue</span>` : ''}</div>
+        ${chips}
+        <div class="tasklist">${list.map(t => taskRow(t, big3ids)).join('') || `<div class="empty">${emptyMsg}</div>`}</div>
+        <div class="tfoot"><span>${footTxt}</span><span class="spacer"></span>${hidden ? `<button class="linkbtn" type="button" data-more="1">Show ${hidden} more</button>` : ui.showAll && ui.bucket === 'now' ? '<button class="linkbtn" type="button" data-more="0">Show fewer</button>' : ''}</div>
+      </section>
+      <aside class="rail">${yes}
+        <section class="card" aria-label="This week"><div class="chead"><h2 class="h sm">This week</h2><span class="sub">deadlines</span></div>${weekHtml}</section>
+        <section class="card" aria-label="People you are meeting"><div class="chead"><h2 class="h sm">Meeting today</h2></div>${meetHtml}</section>
+        <section class="card" aria-label="Going cold"><div class="chead"><h2 class="h sm">Going cold</h2><span class="spacer"></span><a href="#people" style="font-size:13px;font-weight:500">Constellation</a></div>${coldHtml}</section>
+        <section class="card" aria-label="Owed to you"><div class="chead"><h2 class="h sm">Owed to you</h2>${c.owed_to_me.length ? `<span class="sub">${c.owed_to_me.length}</span>` : ''}</div>${owed}</section>
+      </aside>
+    </div></div>`;
+}
+
+// ── Goals (mandala, week by box, mirror) ───────────────────────────────────────────────────────────
+function renderGoals() {
+  const g = S.goals; if (!g) return S.err.goals ? notice(S.err.goals) : loading();
+  const today = S.control?.mode?.day ?? ymd(new Date()); const wkStart = S.week?.week_start ?? mondayOf(today);
+  const week = [...Array(7)].map((_, i) => addDays(wkStart, i)); const dow = Math.max(1, week.indexOf(today) + 1 || 7);
+  const byBox = new Map(g.boxes.map(b => [b.box, b]));
+  const ordered = BOX_ORDER.map(k => byBox.get(k)).filter(Boolean).concat(g.boxes.filter(b => !BOX_ORDER.includes(b.box)));
+  const cellFor = (b) => { if (!b) return '<div class="mcell" style="opacity:.4"></div>';
+    const t = b.targets?.[0];
+    return `<div class="mcell"><i class="glow" style="background:${boxColor(b.box)}"></i><b><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.title)}</b><div class="tr">${esc(b.tracker ?? 'Tracker not set')}</div>
+      <div class="st">${t ? `${esc(t.action)} <span class="mono">${t.done}/${t.target}</span><div class="meter"><i style="width:${Math.min(100, Math.round(100 * t.done / Math.max(1, t.target)))}%;background:${boxColor(b.box)};color:${boxColor(b.box)}"></i></div>` : `${b.done_week} done · ${b.open} open this week`}</div></div>`; };
+  const cells = [ordered[0], ordered[1], ordered[2], ordered[3], 'C', ordered[4], ordered[5], ordered[6], ordered[7]].map(x => x === 'C'
+    ? `<div class="mcell center"><span class="kicker">Center goal</span><div class="cg">${esc(g.center ?? 'No center goal yet')}</div></div>` : cellFor(x)).join('');
+
+  const rows = ordered.map(b => {
+    const t = b.targets?.[0];
+    let target = '<span class="muted" style="font-size:12.5px">Activity only · no weekly target</span>', dots = '<span class="muted" style="font-size:12px">–</span>', verdict = '<span class="verdict none">no target</span>';
+    if (t) {
+      const pct = Math.min(100, Math.round(100 * t.done / Math.max(1, t.target))); const pace = t.target * dow / 7;
+      const v = t.done >= t.target ? ['on', 'done'] : t.done >= pace * 0.75 ? ['on', 'on pace'] : ['behind', 'behind'];
+      target = `<div><div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px"><span>${esc(t.action)}</span><span class="mono">${t.done}/${t.target} ${esc(t.unit ?? '')}</span></div><div class="meter"><i style="width:${pct}%;background:${boxColor(b.box)};color:${boxColor(b.box)}"></i></div></div>`;
+      const byDay = new Map((t.days ?? []).map(d => [String(d.day).slice(0, 10), d]));
+      dots = `<div class="dots" aria-label="Sessions by day">${week.map(d => { const x = byDay.get(d); const n = x?.sessions ?? 0;
+        return `<span class="${n ? 'on' : ''} ${d === today ? 'today' : ''}" style="${n ? `background:${boxColor(b.box)}` : ''}" title="${esc(dayName(d))}: ${n} ${x ? (x.source === 'reported' ? '(you said)' : '(calendar)') : ''}">${n > 1 ? n : new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'narrow', timeZone: 'UTC' })}</span>`; }).join('')}</div>`;
+      verdict = `<span class="verdict ${v[0]}">${v[1]}</span>`;
+    }
+    return `<div class="wrow"><div><div class="gt"><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.title)}</div><div class="tr">Tracker: ${esc(b.tracker ?? 'not set')}</div></div>
+      ${target}${dots}<div class="gk"><b>${b.done_week}</b><span>done</span></div><div class="gk"><b>${b.open}</b><span>open</span></div><div class="gk"><b>${b.hours_week}</b><span>hours</span></div>${verdict}</div>`;
+  }).join('');
+
+  const r = S.review; let mirror;
+  if (!r) mirror = `<div class="empty">${S.err.review ? esc(errText(S.err.review)) : 'Loading the month…'}</div>`;
+  else {
+    const p = r.promises; const kept = p.kept + p.dropped ? Math.round(100 * p.kept / (p.kept + p.dropped)) : null;
+    const month = new Date(r.month + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const rb = new Map(r.boxes.map(b => [b.box, b]));
+    mirror = `<div class="chead" style="align-items:center"><h3 class="h sm" style="margin:0">Promises in ${esc(month)}</h3><span class="spacer"></span>
+        <button class="btn" type="button" data-month="-1" aria-label="Previous month">‹</button><button class="btn" type="button" data-month="0">This month</button><button class="btn" type="button" data-month="1" aria-label="Next month">›</button></div>
+      <div class="stats"><div><b>${p.kept}</b><span>kept</span></div><div><b>${p.dropped}</b><span>dropped</span></div><div><b>${p.late}</b><span>done late</span></div><div><b style="color:${p.open_overdue ? 'var(--warn)' : 'var(--good)'}">${p.open_overdue}</b><span>overdue now</span></div>${kept != null ? `<div><b>${kept}%</b><span>kept of closed</span></div>` : ''}<div><b>${p.late_exact ?? '–'}</b><span>late since 17 Nov (exact)</span></div></div>
+      ${r.approximate_note ? `<p class="pickhint" style="margin:14px 0 0">${esc(r.approximate_note)}</p>` : ''}
+      <div class="mgrid" style="margin-top:16px">${ordered.map(b => { const m = rb.get(b.box); const t = m?.targets?.[0];
+        return `<div class="mbox"><b style="display:flex;gap:8px;align-items:center;font-weight:600"><span class="swatch" style="background:${boxColor(b.box)}"></span>${esc(b.title)}</b>
+          <div style="font-size:13px;margin-top:4px">${m ? `<span class="mono">${m.done_month ?? m.done}</span> done this month · ${m.open} open · ${m.hours} h` : '<span class="muted">No data</span>'}</div>
+          <div class="muted" style="font-size:12px;margin-top:2px">${t ? `${esc(t.action)}: target ${t.weekly_target}/wk, judged weekly above` : 'Activity only'}</div></div>`; }).join('')}</div>
+      <p class="muted" style="margin:14px 0 0;font-size:12.5px">The mirror reads only what the brain recorded; time blocks marked actual count as hours.</p>`;
+  }
+  return `<div class="page">
+    <h1 class="h1">Goals</h1>
+    <section class="mandala" aria-label="Mandala: center goal and eight boxes">${cells}</section>
+    <section class="card" aria-label="This week, by box"><div class="chead"><h2 class="h">This week, by box</h2><span class="sub">Dots are sessions per day. Pace compares progress with how far into the week it is.</span></div>
+      <div class="wrow head"><span>Box</span><span>Weekly target</span><span>Days</span><span>Done</span><span>Open</span><span>Hours</span><span>Pace</span></div>${rows}
+      <p class="muted" style="margin:10px 0 0;font-size:12.5px">Only boxes with a weekly target get a pace. Set one in a check-in ("gym 3 a week").</p></section>
+    <section class="card" id="mirror" aria-label="Mirror"><div class="kicker" style="margin-bottom:8px">Mirror</div>${mirror}</section>
+  </div>`;
+}
+
+// ── Work ───────────────────────────────────────────────────────────────────────────────────────────
+function renderWork() {
+  const w = S.work; if (!w) return S.err.work ? notice(S.err.work) : loading();
+  const byParent = new Map(); for (const p of w) { const k = p.parent_id ?? ''; if (!byParent.has(k)) byParent.set(k, []); byParent.get(k).push(p); }
+  const firms = w.filter(p => p.kind === 'firm' && (p.status === 'active' || p.status === 'paused' || p.stage === 'closed'));
+  const recruiting = w.find(p => p.id === 'recruiting');
+  const open = (p) => (S.control?.tasks ?? []).filter(t => t.pursuit === p.title && t.status !== 'done' && t.status !== 'dropped');
+  const deadlines = firms.filter(f => f.stage !== 'closed' && f.deadline && dueIn(f.deadline) != null && dueIn(f.deadline) >= 0 && dueIn(f.deadline) <= 21).length;
+  const card = (p) => { const nm = p.next_move; const nw = nm ? whenOf(nm) : null; const ts = open(p).filter(t => !nm || t.id !== nm.id);
+    return `<div class="fcard" draggable="true" data-firm="${esc(p.id)}">
+      <div class="ft"><span>${esc(p.title)}</span>${p.deadline ? `<span class="dl">${esc(shortDate(p.deadline))}</span>` : ''}</div>
+      ${nm ? `<div class="nx"><span class="muted">Next:</span> ${esc(nm.action)}${nw.txt ? ` <span class="${nw.late ? 'flag' : 'muted'}" style="font-size:12px">· ${esc(nw.txt)}</span>` : ''}</div>` : '<div class="nx muted">No next move</div>'}
+      ${ts.length ? `<div>${ts.slice(0, 3).map(miniTask).join('')}${ts.length > 3 ? `<div class="muted" style="font-size:12px">+${ts.length - 3} more open</div>` : ''}</div>` : ''}
+      ${p.ask_close ? '<div class="flag" style="font-size:12px">Quiet 14+ days · close it?</div>' : ''}
+      <div class="fm">${p.people.length ? `<button class="linkbtn" type="button" data-org-of="${esc(p.id)}" style="font-size:12px">${p.people.length} ${p.people.length === 1 ? 'person' : 'people'}</button>` : '<span>no contacts</span>'}<span>· ${shortAgo(p.last_activity)}</span><span class="spacer"></span>
+        <select data-stage="${esc(p.id)}" aria-label="Stage for ${esc(p.title)}">${STAGES.map(s => `<option ${s === p.stage ? 'selected' : ''}>${s}</option>`).join('')}</select></div>
+    </div>`; };
+  const cols = STAGES.map(s => { const cs = firms.filter(f => (f.stage ?? 'researching') === s);
+    return `<div class="col ${cs.length ? '' : 'zero'} ${s === 'closed' ? 'closed' : ''}" data-col="${s}"><div class="ch">${esc(cap(s))}<span class="num muted" style="font-weight:400">${cs.length}</span></div>${cs.map(card).join('') || '<div class="drop">Drop a firm here</div>'}</div>`; }).join('');
+  const prow = (p, child) => { const ts = open(p);
+    return `<div class="prow ${child ? 'child' : ''}"><div class="top1"><span class="swatch" style="width:10px;height:10px;background:${boxColor(boxKey(p.goal_id))}"></span><b>${esc(p.title)}</b>
+      ${p.deadline ? `<span class="dl">${esc(shortDate(p.deadline))}</span>` : ''}${p.ask_close ? '<span class="flag" style="font-size:12px">quiet 14+ days: close it?</span>' : ''}
+      <span class="spacer"></span><span class="sm">last activity ${esc(ago(p.last_activity))}</span><span class="mono sm">${p.open_moves ?? ts.length} open</span></div>
+      <div class="sm" style="padding-left:20px">${p.summary ? esc(p.summary) : 'No summary yet. The next compile run writes one.'}${p.next_move ? ` <span style="color:var(--ink)">Next: ${esc(p.next_move.action)}</span>` : ''}</div>
+      ${ts.length ? `<div class="tasks">${ts.slice(0, 5).map(miniTask).join('')}${ts.length > 5 ? `<div class="muted" style="font-size:12px">+${ts.length - 5} more</div>` : ''}</div>` : ''}</div>`; };
+  const tree = (pid, depth) => (byParent.get(pid) ?? []).filter(p => p.status === 'active' || p.status === 'paused').map(p => prow(p, depth > 0) + (p.kind === 'area' ? '' : tree(p.id, depth + 1))).join('');
+  const streams = (byParent.get('recruiting') ?? []).filter(p => p.kind !== 'firm' && (p.status === 'active' || p.status === 'paused'));
+  return `<div class="page">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap"><h1 class="h1">Recruiting</h1><span class="muted">${firms.filter(f => f.stage !== 'closed').length} active firms${deadlines ? ` · ${deadlines} deadline${deadlines === 1 ? '' : 's'} in the next 3 weeks` : ''}</span></div>
+    ${recruiting?.next_move || recruiting?.summary ? `<div class="muted" style="margin-top:-12px">${recruiting.summary ? esc(recruiting.summary) : ''}${recruiting.next_move ? ` <b style="color:var(--ink);font-weight:500">Next: ${esc(recruiting.next_move.action)}</b>` : ''}</div>` : ''}
+    <section class="board" aria-label="Pipeline. Drag a firm to another stage, or use its stage menu."><div class="cols">${cols}</div></section>
+    <section class="card" aria-label="Workstreams"><h2 class="h" style="margin-bottom:4px">Workstreams</h2>${streams.map(p => prow(p, false) + tree(p.id, 1)).join('') || '<div class="empty">No recruiting workstreams.</div>'}</section>
+    <section class="card" aria-label="Other pursuits"><h2 class="h" style="margin-bottom:4px">Other pursuits</h2>${(byParent.get('') ?? []).filter(p => p.id !== 'recruiting' && (p.status === 'active' || p.status === 'paused')).map(p => prow(p, false) + tree(p.id, 1)).join('') || '<div class="empty">None yet.</div>'}</section>
+  </div>`;
+}
+
+// ── People: a zoomable universe ────────────────────────────────────────────────────────────────────
+// Levels: universe > galaxy (life box) > system (organisation) > circles > inner circles … > stars (people).
+// Circles come from who-knows-whom links (label propagation), split again until groups are small.
+function seededRand(seed) { let s = seed % 2147483647 || 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+function buildUniverse(net, work, goals) {
+  const boxTitle = (k) => k === 'other' ? 'Elsewhere' : goals?.boxes.find(b => b.box === k)?.title ?? cap(k);
+  const idsOf = (p) => (p.people ?? []).map(x => typeof x === 'object' && x ? (x.id ?? x.entity_id) : x);
+  const adj = new Map(); net.links.forEach(l => { if (!adj.has(l.a)) adj.set(l.a, new Set()); if (!adj.has(l.b)) adj.set(l.b, new Set()); adj.get(l.a).add(l.b); adj.get(l.b).add(l.a); });
+  const byId = new Map(net.nodes.map(n => [n.id, n]));
+  const orgBox = {};
+  for (const o of net.orgs) {
+    const memb = new Set(net.nodes.filter(n => n.org === o.id).map(n => n.id)); const first = (o.name || '').toLowerCase().split(/\s+/)[0];
+    let box = null;
+    for (const p of work ?? []) { const k = boxKey(p.goal_id); if (!k) continue; if (idsOf(p).some(id => memb.has(id)) || (first.length > 2 && String(p.title).toLowerCase().includes(first))) { box = k; break; } }
+    orgBox[o.id] = BOX_HEX[box] ? box : 'other';
+  }
+  const leaf = (id, color, orgId) => { const n = byId.get(id); return { kind: 'person', key: 'p:' + id, id, name: n.name, last: n.last, owe: n.owe, owes: n.owes, deg: n.deg, color, orgId, lr: 7 + Math.sqrt(n.deg) * 2.4 }; };
+  let ck = 0;
+  const circles = (ids, depth, color, orgId) => {
+    if (ids.length <= 5 || depth > 7) return ids.map(id => leaf(id, color, orgId));
+    const set = new Set(ids); const nb = (id) => [...(adj.get(id) ?? [])].filter(x => set.has(x));
+    const lab = new Map(ids.map(id => [id, id])); const rnd = seededRand(ids.length * 31 + depth);
+    const order = [...ids].sort(() => rnd() - 0.5);
+    for (let it = 0; it < 15; it++) { let ch = false;
+      for (const id of order) { const ns = nb(id); if (!ns.length) continue; const cnt = new Map(); ns.forEach(x => cnt.set(lab.get(x), (cnt.get(lab.get(x)) ?? 0) + 1));
+        let best = lab.get(id), bc = -1; for (const [l, c] of cnt) if (c > bc || (c === bc && String(l) < String(best))) { best = l; bc = c; }
+        if (best !== lab.get(id)) { lab.set(id, best); ch = true; } }
+      if (!ch) break; }
+    const groups = new Map(); ids.forEach(id => { const l = lab.get(id); if (!groups.has(l)) groups.set(l, []); groups.get(l).push(id); });
+    const real = [...groups.values()].filter(g => g.length > 1), singles = [...groups.values()].filter(g => g.length === 1).flat();
+    const degIn = (id) => nb(id).length;
+    if (real.length <= 1 && singles.length === 0) {
+      if (ids.length > 10) { const hub = [...ids].sort((a, b) => degIn(b) - degIn(a))[0]; const sub = circles(ids.filter(x => x !== hub), depth + 1, color, orgId); if (sub.some(s => s.kind === 'circle')) return [leaf(hub, color, orgId), ...sub]; }
+      return ids.map(id => leaf(id, color, orgId));
+    }
+    const out = real.map(g => { const top = [...g].sort((a, b) => degIn(b) - degIn(a))[0];
+      let kids = circles(g, depth + 1, color, orgId); if (kids.length === 1 && kids[0].kind === 'circle') kids = kids[0].children;
+      return { kind: 'circle', key: 'c:' + (ck++), name: `${(() => { const w = String(byId.get(top).name).split(/\s+/); return w.length > 1 ? w[0] + ' ' + w[w.length - 1][0] + '.' : w[0]; })()}'s circle`, color, orgId, children: kids }; });
+    if (singles.length >= 3) out.push({ kind: 'circle', key: 'c:' + (ck++), name: 'Not linked yet', color, orgId, loose: true, children: singles.map(id => leaf(id, color, orgId)) });
+    else singles.forEach(id => out.push(leaf(id, color, orgId)));
+    return out;
+  };
+  const galaxies = new Map();
+  for (const o of net.orgs) { const k = orgBox[o.id]; if (!galaxies.has(k)) galaxies.set(k, []); galaxies.get(k).push(o); }
+  const gOrder = [...BOX_ORDER, 'other'].filter(k => galaxies.has(k));
+  const root = { kind: 'root', key: 'root', name: 'Your universe', color: '#FFFFFF', children: gOrder.map(k => ({
+    kind: 'galaxy', key: 'g:' + k, box: k, name: boxTitle(k), color: BOX_HEX[k],
+    children: galaxies.get(k).map((o, i) => { const col = mix(BOX_HEX[k], Math.min(0.45, i * 0.09)); const ids = net.nodes.filter(n => n.org === o.id).map(n => n.id);
+      return { kind: 'org', key: 'o:' + o.id, orgId: o.id, name: o.name, color: col, children: circles(ids, 0, col, o.id) }; }) })) };
+  // layout: pack each level's children, then place absolutely
+  const gap = { root: 46, galaxy: 22, org: 12, circle: 7 }, pad = { root: 40, galaxy: 34, org: 18, circle: 10 };
+  const pack = (cs) => {
+    if (window.d3?.packSiblings) { window.d3.packSiblings(cs); const e = window.d3.packEnclose(cs); return e; }
+    cs.sort((a, b) => b.r - a.r); const placed = [];
+    for (const c of cs) { if (!placed.length) { c.x = 0; c.y = 0; placed.push(c); continue; }
+      for (let a = 0; ; a += 0.1) { const d = (placed[0].r + c.r) * 0.6 + a * 2.2; c.x = Math.cos(a) * d; c.y = Math.sin(a) * d; if (placed.every(p => Math.hypot(p.x - c.x, p.y - c.y) >= p.r + c.r)) break; }
+      placed.push(c); }
+    const mx = cs.reduce((s, c) => s + c.x, 0) / cs.length, my = cs.reduce((s, c) => s + c.y, 0) / cs.length;
+    return { x: mx, y: my, r: Math.max(...cs.map(c => Math.hypot(c.x - mx, c.y - my) + c.r)) };
+  };
+  const layout = (n) => {
+    if (n.kind === 'person') { n.r = n.lr; return; }
+    n.children.forEach(layout);
+    const allLeaves = n.children.every(c => c.kind === 'person'); const g = allLeaves ? 5 : gap[n.kind];
+    const cs = n.children.map(ch => ({ r: ch.r + g, ch }));
+    const e = pack(cs);
+    cs.forEach(c => { c.ch.rx = c.x - e.x; c.ch.ry = c.y - e.y; });
+    n.r = e.r + pad[n.kind];
+    n.count = n.children.reduce((s, c) => s + (c.kind === 'person' ? 1 : c.count), 0);
+  };
+  layout(root);
+  const all = []; let maxDepth = 0;
+  const place = (n, x, y, depth, parent) => { n.x = x; n.y = y; n.depth = depth; n.parent = parent; all.push(n); maxDepth = Math.max(maxDepth, depth); (n.children ?? []).forEach(c => place(c, x + c.rx, y + c.ry, depth + 1, n)); };
+  place(root, 0, 0, 0, null);
+  const leafById = new Map(all.filter(n => n.kind === 'person').map(n => [n.id, n]));
+  const links = net.links.map(l => ({ a: leafById.get(l.a), b: leafById.get(l.b) })).filter(l => l.a && l.b);
+  return { root, all, links, leafById, byKey: new Map(all.map(n => [n.key, n])), maxDepth };
+}
+
+const SKY = { host: null, cv: null, U: null, sig: '', W: 800, H: 600, dpr: 1, T: { x: 400, y: 300, k: 1 }, kFit: 1, fitted: false,
+  hover: null, hoverGroup: null, vis: [], anim: null, ptrs: new Map(), drag: null, pinch: null, layers: [], motion: true, crumbKey: '' };
+function skyInit() {
+  if (SKY.host) return;
+  SKY.host = document.createElement('div'); SKY.host.className = 'skyhost';
+  SKY.cv = document.createElement('canvas'); SKY.cv.tabIndex = 0;
+  SKY.cv.setAttribute('role', 'application'); SKY.cv.setAttribute('aria-label', 'Constellation of your people. Scroll or pinch to zoom, drag or arrow keys to move, plus and minus to zoom, 0 to see everything. The selected person shows in the panel beside it.');
+  SKY.host.appendChild(SKY.cv);
+  const rnd = seededRand(42);
+  SKY.layers = [0.04, 0.1, 0.22].map((f, li) => ({ f, stars: Array.from({ length: 90 + li * 30 }, () => ({ x: rnd() * 700, y: rnd() * 700, s: (0.5 + rnd() * (0.6 + li * 0.5)), p: rnd() * 6.28, sp: 0.4 + rnd() })) }));
+  SKY.motion = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  new ResizeObserver(() => {
+    const r = SKY.host.getBoundingClientRect(); if (r.width < 10) return;
+    const cx = (SKY.W / 2 - SKY.T.x) / SKY.T.k, cy = (SKY.H / 2 - SKY.T.y) / SKY.T.k;
+    SKY.dpr = window.devicePixelRatio || 1; SKY.W = r.width; SKY.H = r.height;
+    SKY.cv.width = Math.round(SKY.W * SKY.dpr); SKY.cv.height = Math.round(SKY.H * SKY.dpr);
+    if (SKY.U) { SKY.kFit = Math.min(SKY.W, SKY.H) * 0.47 / SKY.U.root.r; if (!SKY.fitted) skyFit(false); else { SKY.T.x = SKY.W / 2 - cx * SKY.T.k; SKY.T.y = SKY.H / 2 - cy * SKY.T.k; } }
+  }).observe(SKY.host);
+  const cv = SKY.cv; const pt = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', (e) => { cv.focus({ preventScroll: true }); cv.setPointerCapture(e.pointerId); const [x, y] = pt(e); SKY.ptrs.set(e.pointerId, { x, y }); SKY.anim = null;
+    if (SKY.ptrs.size === 1) SKY.drag = { x, y, moved: false };
+    if (SKY.ptrs.size === 2) { const [a, b] = [...SKY.ptrs.values()]; SKY.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) }; if (SKY.drag) SKY.drag.moved = true; } });
+  cv.addEventListener('pointermove', (e) => { const [x, y] = pt(e);
+    if (SKY.ptrs.has(e.pointerId)) { SKY.ptrs.set(e.pointerId, { x, y });
+      if (SKY.ptrs.size === 2 && SKY.pinch) { const [a, b] = [...SKY.ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); skyZoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / SKY.pinch.d); SKY.pinch.d = d; return; }
+      if (SKY.drag) { const dx = x - SKY.drag.x, dy = y - SKY.drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) SKY.drag.moved = true; if (SKY.drag.moved) { SKY.T.x += dx; SKY.T.y += dy; cv.style.cursor = 'grabbing'; } SKY.drag.x = x; SKY.drag.y = y; return; } }
+    skyHover(x, y); });
+  const up = (e) => { const [x, y] = pt(e); SKY.ptrs.delete(e.pointerId); if (SKY.ptrs.size < 2) SKY.pinch = null;
+    if (SKY.drag && SKY.ptrs.size === 0) { if (!SKY.drag.moved && e.type === 'pointerup') skyClick(x, y); SKY.drag = null; skyHover(x, y); } };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('pointerleave', () => { if (!SKY.drag) { SKY.hover = null; SKY.hoverGroup = null; } });
+  cv.addEventListener('wheel', (e) => { e.preventDefault(); SKY.anim = null; const [x, y] = pt(e); const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; skyZoomAt(x, y, Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0016))); }, { passive: false });
+  cv.addEventListener('dblclick', (e) => { const [x, y] = pt(e); skyFlyTo({ x: (x - SKY.T.x) / SKY.T.k, y: (y - SKY.T.y) / SKY.T.k, k: SKY.T.k * 2.2 }); });
+  cv.addEventListener('keydown', (e) => { const step = 90, m = { ArrowLeft: [step, 0], ArrowRight: [-step, 0], ArrowUp: [0, step], ArrowDown: [0, -step] };
+    if (m[e.key]) { e.preventDefault(); SKY.anim = null; skyFlyTo({ x: (SKY.W / 2 - SKY.T.x - m[e.key][0]) / SKY.T.k, y: (SKY.H / 2 - SKY.T.y - m[e.key][1]) / SKY.T.k, k: SKY.T.k }, 260); }
+    else if (e.key === '+' || e.key === '=') { e.preventDefault(); skyZoomBy(1.6); } else if (e.key === '-' || e.key === '_') { e.preventDefault(); skyZoomBy(1 / 1.6); } else if (e.key === '0') { e.preventDefault(); skyFit(true); } });
+  const loop = (t) => { if (document.body.contains(SKY.host) && !document.hidden) { skyStep(t); skyDraw(t); } requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+const clampK = (k) => Math.max(SKY.kFit * 0.5, Math.min(SKY.kFit * 900, k));
+function skyZoomAt(px, py, f) { const k = clampK(SKY.T.k * f); f = k / SKY.T.k; SKY.T.x = px - (px - SKY.T.x) * f; SKY.T.y = py - (py - SKY.T.y) * f; SKY.T.k = k; }
+function skyZoomBy(f) { skyFlyTo({ x: (SKY.W / 2 - SKY.T.x) / SKY.T.k, y: (SKY.H / 2 - SKY.T.y) / SKY.T.k, k: SKY.T.k * f }, 350); }
+function skyFit(animate) { if (!SKY.U) return; SKY.kFit = Math.min(SKY.W, SKY.H) * 0.47 / SKY.U.root.r; SKY.fitted = true; const tgt = { x: SKY.U.root.x, y: SKY.U.root.y, k: SKY.kFit }; if (animate) skyFlyTo(tgt); else { SKY.T = { k: tgt.k, x: SKY.W / 2 - tgt.x * tgt.k, y: SKY.H / 2 - tgt.y * tgt.k }; } }
+function skyFocusNode(n) { const r = n.kind === 'person' ? Math.max(n.parent.kind === 'root' ? n.r * 4 : n.parent.r, n.r * 4) : n.r; skyFlyTo({ x: n.kind === 'person' ? n.x : n.x, y: n.y, k: Math.min(SKY.W, SKY.H) * 0.44 / r }); }
+// Fly like a map: zoom out a little, travel, zoom in (d3.interpolateZoom when d3 is there).
+function skyFlyTo(tgt, dur) {
+  const k1 = clampK(tgt.k); const W = SKY.W, H = SKY.H; const a = [(W / 2 - SKY.T.x) / SKY.T.k, (H / 2 - SKY.T.y) / SKY.T.k, W / SKY.T.k], b = [tgt.x, tgt.y, W / k1];
+  if (!SKY.motion) { SKY.T = { k: k1, x: W / 2 - b[0] * k1, y: H / 2 - b[1] * k1 }; return; }
+  let interp, d = dur ?? 800;
+  if (window.d3?.interpolateZoom) { interp = window.d3.interpolateZoom(a, b); d = dur ?? Math.max(450, Math.min(1500, interp.duration * 0.8)); }
+  else interp = (p) => [a[0] + (b[0] - a[0]) * p, a[1] + (b[1] - a[1]) * p, a[2] * Math.pow(b[2] / a[2], p)];
+  SKY.anim = { interp, t0: performance.now(), d };
+}
+function skyStep(now) {
+  const A = SKY.anim; if (!A) return;
+  let p = Math.min(1, (now - A.t0) / A.d); const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+  const v = A.interp(e); const k = SKY.W / v[2]; SKY.T = { k, x: SKY.W / 2 - v[0] * k, y: SKY.H / 2 - v[1] * k };
+  if (p >= 1) SKY.anim = null;
+}
+function skySetData(net) {
+  const sig = net.nodes.map(n => n.id).join(',') + '|' + net.links.length + '|' + net.orgs.map(o => o.id).join(',') + '|' + (S.work ? 'w' : '');
+  if (sig === SKY.sig && SKY.U) { const by = new Map(net.nodes.map(n => [n.id, n])); SKY.U.leafById.forEach((l, id) => { const f = by.get(id); if (f) Object.assign(l, { last: f.last, owe: f.owe, owes: f.owes }); }); return; }
+  SKY.sig = sig; SKY.U = buildUniverse(net, S.work, S.goals); SKY.crumbKey = '';
+  SKY.kFit = Math.min(SKY.W, SKY.H) * 0.47 / SKY.U.root.r; SKY.fitted = false; skyFit(false);
+}
+const smooth = (x, a, b) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function litOf(n) { const q = S.ui.q.trim().toLowerCase(), of = S.ui.org;
+  if (n.kind === 'person') { if (q) return n.name.toLowerCase().includes(q); if (of) return n.orgId === of; return true; }
+  if (of) { if (n.kind === 'galaxy') return n.children.some(o => o.orgId === of); if (n.kind === 'root') return true; return n.orgId === of; }
+  return true; }
+function starSize(n) { const zf = Math.max(1, Math.min(3.4, Math.pow(SKY.T.k / SKY.kFit, 0.33))); return (1.4 + Math.sqrt(n.deg + 1) * 1.05) * zf; }
+function skyDraw(t) {
+  const cv = SKY.cv, ctx = cv.getContext('2d'), W = SKY.W, H = SKY.H, T = SKY.T, k = T.k, minWH = Math.min(W, H);
+  ctx.setTransform(SKY.dpr, 0, 0, SKY.dpr, 0, 0);
+  const g = ctx.createRadialGradient(W * 0.5, H * 0.45, 0, W * 0.5, H * 0.45, Math.max(W, H) * 0.8);
+  g.addColorStop(0, '#141A36'); g.addColorStop(0.55, '#090C1B'); g.addColorStop(1, '#04050A'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // parallax star layers move slower than the map, so panning feels like travelling
+  const zl = Math.log2(k / SKY.kFit);
+  for (const L of SKY.layers) { const tile = 700, ox = ((T.x * L.f) % tile + tile) % tile, oy = ((T.y * L.f) % tile + tile) % tile; const sc = 1 + Math.max(-0.3, zl) * L.f * 0.6;
+    for (let ty = -1; ty * tile < H; ty++) for (let tx = -1; tx * tile < W; tx++) for (const s of L.stars) {
+      const x = (tx * tile + s.x + ox) * sc - (sc - 1) * W / 2, y = (ty * tile + s.y + oy) * sc - (sc - 1) * H / 2; if (x < -2 || y < -2 || x > W + 2 || y > H + 2) continue;
+      const a = SKY.motion ? 0.15 + 0.4 * Math.pow(Math.sin(t * 0.0006 * s.sp + s.p), 2) : 0.3; ctx.fillStyle = `rgba(215,224,255,${a.toFixed(2)})`; ctx.fillRect(x, y, s.s, s.s); } }
+  const U = SKY.U; if (!U) return;
+  const vis = [], labels = [], focus = SKY.hover;
+  const walk = (n) => {
+    const sx = n.x * k + T.x, sy = n.y * k + T.y, R = n.r * k;
+    if (sx + R < 0 || sx - R > W || sy + R < 0 || sy - R > H) return;
+    if (n.kind === 'person') { vis.push(n); return; }
+    if (n.kind !== 'root') {
+      const dim = litOf(n) ? 1 : 0.22;
+      if (R < 10) { const r = Math.max(1.6, R * 0.75); ctx.shadowColor = n.color; ctx.shadowBlur = 12 * dim; ctx.fillStyle = hexA(n.color, 0.75 * dim); ctx.beginPath(); ctx.arc(sx, sy, r, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+        if (n.kind === 'galaxy' || (n.kind === 'org' && R > 4)) labels.push({ n, sx, sy, R, agg: true, dim }); return; }
+      const a0 = { galaxy: 0.15, org: 0.11, circle: 0.08 }[n.kind] * dim * (n.loose ? 0.6 : 1);
+      const ng = ctx.createRadialGradient(sx, sy, 0, sx, sy, R); ng.addColorStop(0, hexA(n.color, a0)); ng.addColorStop(0.55, hexA(n.color, a0 * 0.4)); ng.addColorStop(1, hexA(n.color, 0));
+      ctx.fillStyle = ng; ctx.beginPath(); ctx.arc(sx, sy, R, 0, 6.283); ctx.fill();
+      const ring = smooth(R, 50, 160) * (n === SKY.hoverGroup ? 0.55 : 0.22) * dim;
+      if (ring > 0.01) { ctx.strokeStyle = hexA(n.color, ring); ctx.lineWidth = n.kind === 'galaxy' ? 1.2 : 1; ctx.setLineDash(n.kind === 'circle' ? [3, 6] : []); ctx.beginPath(); ctx.arc(sx, sy, R, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); }
+      labels.push({ n, sx, sy, R, dim });
+    }
+    n.children.forEach(walk);
+  };
+  walk(U.root);
+  SKY.vis = vis;
+  const vset = new Set(vis); const nb = new Set();
+  if (focus) U.links.forEach(l => { if (l.a === focus) nb.add(l.b); if (l.b === focus) nb.add(l.a); });
+  const lk = smooth(k / SKY.kFit, 0.8, 3);
+  for (const l of U.links) {
+    if (!vset.has(l.a) && !vset.has(l.b)) continue;
+    const ax = l.a.x * k + T.x, ay = l.a.y * k + T.y, bx = l.b.x * k + T.x, by = l.b.y * k + T.y;
+    const hot = focus && (l.a === focus || l.b === focus); const same = l.a.orgId === l.b.orgId; const on = litOf(l.a) && litOf(l.b);
+    const a = hot ? 0.85 : (same ? 0.12 + 0.3 * lk : 0.06 + 0.12 * lk) * (on ? 1 : 0.2);
+    ctx.strokeStyle = hot ? 'rgba(255,255,255,0.85)' : same ? hexA(l.a.color, a) : `rgba(220,228,255,${a.toFixed(3)})`; ctx.lineWidth = hot ? 1.6 : 1;
+    ctx.beginPath(); ctx.moveTo(ax, ay); if (same) ctx.lineTo(bx, by); else { const mx = (ax + bx) / 2, my = (ay + by) / 2, cx = W / 2, cy = H / 2; ctx.quadraticCurveTo(mx + (cx - mx) * 0.25, my + (cy - my) * 0.25, bx, by); } ctx.stroke();
+  }
+  for (const n of vis) {
+    const sx = n.x * k + T.x, sy = n.y * k + T.y, s = starSize(n), on = litOf(n), kk = on ? 1 : 0.15, d = daysAgo(n.last);
+    if (d == null) { ctx.strokeStyle = hexA(n.color, 0.85 * kk); ctx.lineWidth = 1.3; ctx.fillStyle = hexA(n.color, 0.08 * kk); ctx.beginPath(); ctx.arc(sx, sy, s + 0.5, 0, 6.283); ctx.fill(); ctx.stroke(); }
+    else { const b = d <= 14 ? 1 : d <= 45 ? 0.6 : 0.35; const tw = SKY.motion && b === 1 ? 0.85 + 0.15 * Math.sin(t * 0.002 + n.lr * 3) : 1;
+      ctx.shadowColor = n.color; ctx.shadowBlur = (8 + s * 3) * b * kk * tw; ctx.fillStyle = hexA(n.color, b * kk); ctx.beginPath(); ctx.arc(sx, sy, s, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0;
+      ctx.fillStyle = `rgba(255,255,255,${(0.85 * b * kk).toFixed(3)})`; ctx.beginPath(); ctx.arc(sx, sy, s * 0.42, 0, 6.283); ctx.fill(); }
+    if (n.owe && s > 2.4) { const ang = SKY.motion ? t * 0.0012 + n.lr : 0.8, rr = s + 6; ctx.strokeStyle = `rgba(240,177,85,${(0.85 * kk).toFixed(2)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx, sy, rr, 0, 6.283); ctx.stroke(); ctx.fillStyle = `rgba(240,177,85,${kk})`; ctx.beginPath(); ctx.arc(sx + Math.cos(ang) * rr, sy + Math.sin(ang) * rr, 2, 0, 6.283); ctx.fill(); }
+    if (n.id === S.personId) { ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx, sy, s + (n.owe ? 11 : 7), 0, 6.283); ctx.stroke(); }
+    const room = n.r * k; const la = n === focus || n.id === S.personId ? 1 : nb.has(n) ? 0.9 : smooth(room, 9, 18) * (on ? 1 : 0.2);
+    if (la > 0.02) { const big = n === focus || n.id === S.personId; ctx.textAlign = 'center'; ctx.font = (big ? '600 12.5px' : '500 11.5px') + ' Inter, sans-serif';
+      ctx.fillStyle = `rgba(232,236,255,${(la * (big ? 1 : 0.8)).toFixed(3)})`; const ly = sy + s + (n.owe && s > 2.4 ? 20 : 15); ctx.fillText(n.name, sx, ly);
+      const da = big ? 1 : smooth(room, 42, 60) * la;
+      if (da > 0.02) { ctx.font = '500 10.5px "JetBrains Mono", monospace'; ctx.fillStyle = `rgba(160,170,205,${(da * 0.9).toFixed(3)})`;
+        ctx.fillText([d == null ? 'never contacted' : d <= 0 ? 'today' : `${d}d ago`, n.owe ? 'you owe' : n.owes ? 'owes you' : ''].filter(Boolean).join(' · '), sx, ly + 14); } }
+  }
+  for (const L of labels) {
+    const n = L.n; ctx.textAlign = 'center';
+    if (L.agg) { if (n.kind === 'org' && L.R < 5) continue; ctx.font = (n.kind === 'galaxy' ? '600 10.5px' : '500 10.5px') + ' Inter, sans-serif'; ctx.fillStyle = hexA(n.color, 0.75 * L.dim); ctx.fillText(n.kind === 'galaxy' ? n.name.toUpperCase() : n.name, L.sx, L.sy - Math.max(2, L.R) - 6); continue; }
+    const la = (R) => smooth(R, 34, 80) * (1 - smooth(R, minWH * 0.75, minWH * 1.5));
+    const a = la(L.R) * L.dim; if (a < 0.02) continue;
+    if (n.parent && n.parent.kind !== 'root' && n.parent.children.filter(c => c.kind !== 'person').length === 1 && la(n.parent.r * k) > 0.25) continue;
+    const y = Math.max(L.sy - L.R + (n.kind === 'galaxy' ? 26 : 20), 104);
+    if (n.kind === 'galaxy') { ctx.font = '600 12.5px Inter, sans-serif'; if ('letterSpacing' in ctx) ctx.letterSpacing = '3px'; ctx.fillStyle = hexA(n.color, 0.9 * a); ctx.fillText(n.name.toUpperCase(), L.sx, y); if ('letterSpacing' in ctx) ctx.letterSpacing = '0px'; }
+    else if (n.kind === 'org') { ctx.font = '600 14.5px "Space Grotesk", Inter, sans-serif'; ctx.fillStyle = hexA(mix(n.color, 0.35), 0.95 * a); ctx.fillText(n.name, L.sx, y); }
+    else { ctx.font = 'italic 500 12px Inter, sans-serif'; ctx.fillStyle = hexA(mix(n.color, 0.3), 0.8 * a); ctx.fillText(n.name, L.sx, y); }
+    ctx.font = '500 10.5px "JetBrains Mono", monospace'; ctx.fillStyle = `rgba(160,170,205,${(0.7 * a).toFixed(3)})`; ctx.fillText(`${n.count} ${n.count === 1 ? 'person' : 'people'}`, L.sx, y + 15);
+  }
+  skyCrumbs(); skyMini();
+}
+function skyPath() { // which nested groups the centre of the view is inside, deep enough to fill it
+  const U = SKY.U; const T = SKY.T, minWH = Math.min(SKY.W, SKY.H); const cx = (SKY.W / 2 - T.x) / T.k, cy = (SKY.H / 2 - T.y) / T.k;
+  const path = [U.root]; let cur = U.root;
+  for (;;) { const nx = (cur.children ?? []).find(c => c.kind !== 'person' && Math.hypot(c.x - cx, c.y - cy) < c.r && c.r * T.k > minWH * 0.3); if (!nx) break; path.push(nx); cur = nx; }
+  return path;
+}
+function skyCrumbs() {
+  const el = document.getElementById('skycrumbs'); if (!el || !SKY.U) return;
+  const path = skyPath(); const key = path.map(n => n.key).join('>');
+  if (key === SKY.crumbKey && el.childElementCount) return; SKY.crumbKey = key;
+  const word = { root: 'universe', galaxy: 'galaxy', org: 'system', circle: 'circle' };
+  el.innerHTML = path.map((n, i) => `${i ? '<span class="sep" aria-hidden="true">›</span>' : ''}<button type="button" data-fly="${esc(n.key)}" ${i === path.length - 1 ? 'aria-current="true"' : ''} title="Zoom to this ${word[n.kind]}">${n.kind === 'root' ? '✦ ' : ''}${esc(n.kind === 'root' ? 'Universe' : n.name)}</button>`).join('');
+  const lp = document.getElementById('skylevel'); if (lp) lp.textContent = `level ${path.length} of ${SKY.U.maxDepth + 1}`;
+}
+function skyMini() {
+  const mc = document.getElementById('skymini'); if (!mc || !SKY.U) return;
+  const W = mc.clientWidth, H = mc.clientHeight; if (!W) return; const dpr = window.devicePixelRatio || 1;
+  if (mc.width !== Math.round(W * dpr)) { mc.width = Math.round(W * dpr); mc.height = Math.round(H * dpr); }
+  const c = mc.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const U = SKY.U, s = Math.min(W, H) * 0.46 / U.root.r; const X = (x) => W / 2 + (x - U.root.x) * s, Y = (y) => H / 2 + (y - U.root.y) * s;
+  for (const g of U.root.children) { c.fillStyle = hexA(g.color, 0.25); c.beginPath(); c.arc(X(g.x), Y(g.y), Math.max(2, g.r * s), 0, 6.283); c.fill();
+    for (const o of g.children) { c.fillStyle = hexA(o.color, 0.8); c.beginPath(); c.arc(X(o.x), Y(o.y), Math.max(1, o.r * s * 0.5), 0, 6.283); c.fill(); } }
+  const T = SKY.T; const x0 = X(-T.x / T.k), y0 = Y(-T.y / T.k), x1 = X((SKY.W - T.x) / T.k), y1 = Y((SKY.H - T.y) / T.k);
+  c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 1; c.strokeRect(Math.max(1, x0), Math.max(1, y0), Math.max(3, Math.min(W - 2, x1) - Math.max(1, x0)), Math.max(3, Math.min(H - 2, y1) - Math.max(1, y0)));
+  mc._toWorld = (mx, my) => [(mx - W / 2) / s + U.root.x, (my - H / 2) / s + U.root.y];
+}
+function skyHit(x, y) {
+  let best = null, bd = 1e9; for (const n of SKY.vis) { const sx = n.x * SKY.T.k + SKY.T.x, sy = n.y * SKY.T.k + SKY.T.y; const d = Math.hypot(sx - x, sy - y); if (d < Math.max(starSize(n) + 6, 11) && d < bd) { best = n; bd = d; } }
+  return best;
+}
+function skyDiveTarget(x, y) { // the group one level below what fills the view, under the pointer
+  if (!SKY.U) return null; const wx = (x - SKY.T.x) / SKY.T.k, wy = (y - SKY.T.y) / SKY.T.k, minWH = Math.min(SKY.W, SKY.H);
+  let cur = SKY.U.root;
+  for (;;) { const nx = (cur.children ?? []).find(c => c.kind !== 'person' && Math.hypot(c.x - wx, c.y - wy) < c.r); if (!nx) return null; if (nx.r * SKY.T.k < minWH * 0.42) return nx; cur = nx; }
+}
+function skyHover(x, y) { const h = skyHit(x, y); SKY.hover = h; SKY.hoverGroup = h ? null : skyDiveTarget(x, y); SKY.cv.style.cursor = h ? 'pointer' : SKY.hoverGroup ? 'zoom-in' : 'grab'; }
+function skyClick(x, y) { const h = skyHit(x, y); if (h) { selectPerson(h.id); return; } const g = skyDiveTarget(x, y); if (g) skyFocusNode(g); }
+function skyFlyKey(key) { const n = SKY.U?.byKey.get(key); if (!n) return; if (n.kind === 'root') skyFit(true); else skyFocusNode(n); }
+async function selectPerson(id) {
+  S.personId = id; S.person = null; render();
+  try { S.person = await view('person', { id }); } catch (e) { toast(errText(e)); }
+  render();
+}
+function personCard() {
+  if (!S.personId) return `<div class="muted" style="margin:auto;text-align:center;max-width:240px">Click a star to see who they are, who they know, what you owe each other and your history.</div>`;
+  const node = S.net?.nodes.find(n => n.id === S.personId); const org = node && S.net.orgs.find(o => o.id === node.org); const leafN = SKY.U?.leafById.get(S.personId);
+  const p = S.person; if (!p || !p.entity) return `<div class="pname">${esc(node?.name ?? '')}</div><div class="muted">Loading…</div>`;
+  const e = p.entity;
+  const knows = S.net ? S.net.links.filter(l => l.a === S.personId || l.b === S.personId).map(l => S.net.nodes.find(n => n.id === (l.a === S.personId ? l.b : l.a))).filter(Boolean) : [];
+  const colorOf = (id) => SKY.U?.leafById.get(id)?.color ?? '#8C93A8'; const orgName = (n) => S.net.orgs.find(o => o.id === n.org)?.name ?? '';
+  return `<div>${org ? `<div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-3);font-weight:500"><span class="swatch" style="background:${leafN?.color ?? '#8C93A8'}"></span>${esc(org.name)}${leafN?.parent?.kind === 'circle' ? ' · ' + esc(leafN.parent.name) : ''}</div>` : ''}
+      <div class="pname">${esc(e.name)}</div>${e.summary ? `<div style="color:var(--ink-2);margin-top:2px">${esc(e.summary)}</div>` : ''}</div>
+    <div class="tiles"><div><span>Last contact</span><b>${p.last_contact ? esc(ago(p.last_contact.at)) : 'Never'}</b></div><div><span>First contact</span><b>${p.first_contact ? esc(shortDate(p.first_contact.at)) : '–'}</b></div><div><span>Knows</span><b class="mono">${knows.length}</b></div></div>
+    <div class="sec"><h3>You owe</h3>${p.i_owe.length ? p.i_owe.map(c => taskRow(c)).join('') : '<div class="empty">Nothing.</div>'}</div>
+    <div class="sec"><h3>Owes you</h3>${p.owes_me.length ? p.owes_me.map(c => `<div class="lrow">${esc(c.action)}${c.due ? ` <span class="muted" style="font-size:12px">· ${esc(shortDate(c.due))}</span>` : ''}</div>`).join('') : '<div class="empty">Nothing.</div>'}</div>
+    <dl class="kvl">
+      ${p.contacts.map(c => `<dt>${esc(c.kind)}</dt><dd><span class="mono" style="font-size:12.5px">${esc(c.value)}</span><button class="copy" type="button" data-copy="${esc(c.value)}">Copy</button></dd>`).join('')}
+      ${!p.contacts.find(c => c.kind === 'email') ? '<dt>email</dt><dd class="muted">not known</dd>' : ''}
+      ${p.last_contact ? `<dt>last</dt><dd>${esc(shortDate(p.last_contact.at))} · ${esc(p.last_contact.channel)}${p.last_contact.title ? ' · ' + esc(p.last_contact.title) : ''}</dd>` : ''}
+      ${p.first_contact ? `<dt>first</dt><dd>${esc(shortDate(p.first_contact.at))} · ${esc(p.first_contact.channel)}</dd>` : ''}
+      ${p.facts.slice(0, 8).map(f => `<dt>${esc(f.predicate.replace(/_/g, ' '))}</dt><dd>${esc(f.value)}</dd>`).join('')}
+    </dl>
+    <div class="sec"><h3>Knows</h3>${knows.length ? knows.map(n => `<button class="lrow click" type="button" data-selp="${esc(n.id)}"><span class="swatch" style="background:${colorOf(n.id)};align-self:center"></span><b style="font-weight:500;flex:1">${esc(n.name)}</b><span class="muted" style="font-size:12.5px">${esc(orgName(n))}</span></button>`).join('') : '<div class="empty">No known links yet.</div>'}</div>
+    <div class="sec"><h3>Timeline</h3>${p.timeline.length ? `<div class="tline">${p.timeline.slice(0, 10).map(t => `<div><span class="mono">${esc(shortDate(t.at))}</span><span class="muted">${esc(t.channel)}</span><span>${esc(t.title ?? '')}</span></div>`).join('')}</div>` : '<div class="empty">No history recorded.</div>'}</div>`;
+}
+function renderPeople() {
+  const net = S.net; if (!net) return S.err.people ? notice(S.err.people) : loading();
+  const orgColor = (o) => SKY.U?.byKey.get('o:' + o.id)?.color ?? '#8C93A8';
+  const chips = `<button type="button" data-orgf="" aria-pressed="${!S.ui.org}">All<span class="num">${net.nodes.length}</span></button>` +
+    net.orgs.map(o => `<button type="button" data-orgf="${esc(o.id)}" aria-pressed="${S.ui.org === o.id}"><span class="swatch" style="background:${orgColor(o)}"></span>${esc(o.name)}<span class="num">${o.n}</span></button>`).join('');
+  const cold = net.nodes.filter(n => (daysAgo(n.last) ?? -1) > 30).sort((a, b) => new Date(a.last) - new Date(b.last)).slice(0, 6);
+  const orgOf = (n) => net.orgs.find(o => o.id === n.org);
+  return `<div class="page">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap"><h1 class="h1">Your constellation</h1>
+      <span class="muted">${net.nodes.length} people · ${net.orgs.length} organisations · ${net.links.length} links</span><span class="spacer"></span>
+      <label class="search">${SEARCH_ICON}<span class="sr">Find a person</span><input id="psearch" type="search" placeholder="Find a person, press Enter to fly there" value="${esc(S.ui.q)}" autocomplete="off"></label></div>
+    <div class="row2" style="align-items:stretch">
+      <section class="sky" id="skyslot" aria-label="Constellation">
+        <nav class="skyui crumbs" id="skycrumbs" aria-label="Where you are"></nav>
+        <div class="skyui skychips" role="group" aria-label="Organisation filter">${chips}</div>
+        <div class="skyui zoomui"><button type="button" data-zoom="in" aria-label="Zoom in">+</button><button type="button" data-zoom="out" aria-label="Zoom out">−</button><button type="button" data-zoom="fit" aria-label="Show everything">⌂</button></div>
+        <div class="skyui levelpill" id="skylevel" aria-hidden="true"></div>
+        ${net.nodes.length ? '' : '<div class="skymsg">No people with an organisation yet.</div>'}
+        <canvas class="skyui minimap" id="skymini" aria-label="Overview map. Click to move there." role="img"></canvas>
+        <div class="skyui skylegend"><span><i class="swatch" style="width:9px;height:9px;background:#E8ECFF;box-shadow:0 0 10px 2px rgba(143,160,255,.9)"></i>talked in 2 weeks</span><span><i class="swatch" style="background:#5C6380"></i>quiet 6+ weeks</span><span><i class="swatch" style="border:1.3px solid #9AA3C0;background:transparent"></i>never contacted</span><span><i class="swatch" style="width:11px;height:11px;border:1.2px solid #F0B155;background:transparent"></i>you owe them</span>
+          <span class="hint">Galaxies are your goal boxes, systems are organisations, circles are people who know each other. Scroll to zoom, drag to move, click a glow to dive in.</span></div>
+      </section>
+      <aside class="pcard" aria-label="Selected person" aria-live="polite">${personCard()}</aside>
+    </div>
+    ${cold.length ? `<section aria-label="Going cold" style="display:flex;flex-direction:column;gap:12px"><div class="chead" style="margin:0"><h2 class="h">Going cold</h2><span class="sub">no contact in 30+ days</span></div>
+      <div class="cold">${cold.map(n => `<button class="coldc" type="button" data-selp="${esc(n.id)}" data-flyp="1"><span class="av" style="background:${SKY.U?.leafById.get(n.id)?.color ?? '#8C93A8'}"></span><span style="flex:1;min-width:0"><b>${esc(n.name)}</b><small>${esc(orgOf(n)?.name ?? '')} · ${esc(ago(n.last))}</small></span>${n.owe ? '<span class="flag" style="font-size:12px">you owe</span>' : ''}</button>`).join('')}</div></section>` : ''}
+    ${S.sky?.unplaced || net.skipped ? `<p class="muted" style="margin:0;font-size:12.5px">${S.sky?.unplaced ? `${S.sky.unplaced} people have no organisation yet. ` : ''}${net.skipped ? `${net.skipped} smaller organisations are left out of the sky.` : ''}</p>` : ''}
+  </div>`;
+}
+function mountSky() {
+  const slot = $('#skyslot'); if (!slot || !S.net) return;
+  skyInit(); skySetData(S.net); slot.insertBefore(SKY.host, slot.firstChild); SKY.crumbKey = '';
+  const mc = $('#skymini'); if (mc) mc.addEventListener('click', (e) => { if (!mc._toWorld) return; const r = mc.getBoundingClientRect(); const [x, y] = mc._toWorld(e.clientX - r.left, e.clientY - r.top); skyFlyTo({ x, y, k: SKY.T.k }, 500); });
+}
+function flyToPerson(id) { const n = SKY.U?.leafById.get(id); if (n) skyFocusNode(n.parent && n.parent.kind !== 'root' ? n.parent : n); }
+
+// ── Plan ───────────────────────────────────────────────────────────────────────────────────────────
+const HOUR = 40;
+function renderPlan() {
+  const w = S.week; if (!w) return S.err.plan ? notice(S.err.plan) : loading();
+  const start = w.week_start; const days = [...Array(7)].map((_, i) => addDays(start, i));
+  const today = ymd(new Date());
+  const span = (it) => { const s = nyMinutes(it.start); let e = it.end ? nyMinutes(it.end) : s + 60; if (ymd(new Date(it.end ?? it.start)) !== ymd(new Date(it.start)) || e <= s) e = 24 * 60; return [s, e]; };
+  const place = (it, cls, label, extra = '') => { const [s, e] = span(it); const top = s / 60 * HOUR, h = Math.max(18, (e - s) / 60 * HOUR - 3);
+    return `<div class="item ${cls}" style="top:${top}px;height:${h}px" ${extra}><b>${esc(label)}</b><span class="tm">${tme(it.start)}–${it.end_known === false ? '?' : tme(it.end)}</span></div>`; };
+  const awakeDay = (w.utilization?.awake_hours ?? 112) / 7;
+  const heads = days.map(d => {
+    const mins = [...w.events, ...w.blocks].filter(x => ymd(new Date(x.start)) === d).reduce((a, x) => { const [s, e] = span(x); return a + (e - s); }, 0);
+    const pct = Math.min(100, Math.round(mins / 60 / awakeDay * 100));
+    return `<div class="dh ${d === today ? 'today' : ''}"><b>${new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })}</b> <span class="mono muted" style="font-size:12px">${new Date(d + 'T12:00:00Z').getUTCDate()}</span>
+      <div class="load"><i style="width:${pct}%;${pct > 70 ? 'background:var(--now)' : ''}"></i></div><small>${pct}% booked</small></div>`; }).join('');
+  const cols = days.map(d => {
+    const evs = w.events.filter(e => ymd(new Date(e.start)) === d).map(e => place(e, (e.is_class ? 'cls' : 'event') + (e.end_known ? '' : ' noend'), e.title, `title="${esc(e.title)}${e.end_known ? '' : ' (no end time in the calendar)'}"`)).join('');
+    const bl = w.blocks.filter(b => ymd(new Date(b.start)) === d).map(b => place(b, 'block' + (b.kind === 'actual' ? ' actual' : ''), b.title ?? 'Block', `data-block="${b.id}" data-pop="1" title="${esc(b.title ?? '')}"`)).join('');
+    const nl = d === today ? `<div class="nowline" style="top:${nyMinutes(new Date().toISOString()) / 60 * HOUR}px"></div>` : '';
+    return `<div class="daycol ${S.pick ? 'picking' : ''}" data-day="${d}">${evs}${bl}${nl}</div>`;
+  }).join('');
+  const hours = [...Array(24)].map((_, h) => `<div>${h === 0 ? '' : String(h).padStart(2, '0')}</div>`).join('');
+  const u = w.utilization; const free = Math.max(0, u.awake_hours - u.event_hours - u.planned_hours);
+  const totalEst = w.backlog.reduce((a, c) => a + (c.estimate_min ?? 0), 0);
+  const backlog = w.backlog.map(c => { const wn = whenOf(c);
+    return `<button class="bl" type="button" draggable="true" data-pick="${c.id}" aria-pressed="${S.pick === c.id}">${GRIP}<span class="b"><div>${esc(c.action)}</div><small><span class="swatch" style="width:6px;height:6px;background:${boxColor(boxKey(c.goal_id))}"></span>${esc(c.pursuit ?? 'Unfiled')}${wn.txt ? ` · <span class="${wn.late ? 'flag' : ''}">${esc(wn.txt)}</span>` : ''}</small></span>${c.estimate_min ? `<span class="mono muted" style="font-size:12px">${fmtMin(c.estimate_min)}${c.estimate_source === 'default' ? '?' : ''}</span>` : ''}</button>`; }).join('') || '<div class="empty">Everything open is already planned this week.</div>';
+  return `<div class="page" style="gap:16px">
+    <div class="wkhead"><h1 class="h1">Week of ${esc(shortDate(start))}</h1>
+      <button class="btn" type="button" data-week="-1" aria-label="Previous week">‹</button><button class="btn" type="button" data-week="0">This week</button><button class="btn" type="button" data-week="1" aria-label="Next week">›</button>
+      <span class="spacer"></span><div class="util"><span><b>${u.event_hours}h</b> events</span><span><b style="color:var(--accent)">${u.planned_hours}h</b> planned</span><span><b style="color:var(--good)">${free.toFixed(1)}h</b> free while awake</span>${w.events_without_end ? `<span class="flag">${w.events_without_end} without an end time</span>` : ''}</div></div>
+    ${S.pick ? `<div class="pickhint">Click a time in the grid to plan "${esc((w.backlog.find(c => c.id === S.pick) || {}).action ?? '')}". Esc to cancel.</div>` : ''}
+    <div class="row2">
+      <div class="grow" style="flex-basis:720px"><div class="gridwrap" id="gridwrap"><div class="wk"><div class="corner"></div>${heads}<div class="hours">${hours}</div>${cols}</div></div>
+        <div class="legend" style="margin-top:10px"><span><i style="background:var(--evt-bg);border:1px solid var(--evt-line)"></i>event</span><span><i style="background:var(--cls)"></i>class</span><span><i style="background:var(--accent-soft);border:1px dashed var(--accent)"></i>your block</span><span><i style="border:1px dashed var(--ink-4)"></i>no end time</span></div></div>
+      <aside class="rail" style="flex-basis:300px;gap:10px"><div class="chead" style="margin:0"><h2 class="h">To plan</h2><span class="sub">${w.backlog.length} tasks${totalEst ? ' · ' + fmtMin(totalEst) : ''}</span></div>
+        <p class="muted" style="margin:0;font-size:12.5px">Drag a task onto the week, or click it and then click a time. It snaps to 30 minutes and sizes itself to the estimate.</p>
+        <div class="backlog">${backlog}</div></aside>
+    </div></div>`;
+}
+function scrollPlan() { const g = $('#gridwrap'); if (g && !g.dataset.scrolled) { g.scrollTop = 7 * HOUR; g.dataset.scrolled = '1'; } }
+
+// ── Brain health ───────────────────────────────────────────────────────────────────────────────────
+function renderTrust() {
+  const t = S.trust; if (!t) return S.err.trust ? notice(S.err.trust) : loading();
+  const h = S.control?.health;
+  return `<div class="page">
+    <h1 class="h1">Brain health</h1>
+    ${h ? `<div class="stats card" style="padding:18px 24px"><div><b>${h.waiting}</b><span>source${h.waiting === 1 ? '' : 's'} waiting</span></div><div><b style="font-size:18px">${h.last_source ? esc(fmt(h.last_source, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })) : 'none'}</b><span>newest source</span></div><div><b style="font-size:18px">${h.last_compile ? esc(fmt(h.last_compile, { weekday: 'short', hour: 'numeric', minute: '2-digit' })) : 'not logged'}</b><span>last compile</span></div></div>` : ''}
+    <div class="row2">
+      <section class="card grow" style="flex-basis:520px"><div class="chead"><h2 class="h">Facts that may be stale</h2><span class="sub">${t.stale.length}</span></div><div class="scrollx"><table class="t"><thead><tr><th>About</th><th>Fact</th><th>Age</th></tr></thead><tbody>
+        ${t.stale.slice(0, 40).map(s => `<tr><td>${esc(s.subject)}</td><td>${esc(s.predicate)}: ${esc(s.value)}</td><td class="num">${s.age_days}d <span class="muted">/ ${s.limit_days}</span></td></tr>`).join('') || '<tr><td colspan="3" class="muted">Nothing stale.</td></tr>'}</tbody></table></div></section>
+      <div class="rail" style="flex-basis:420px">
+        <section class="card"><div class="chead"><h2 class="h sm">Compile runs</h2></div>${t.runs.map(r => `<div class="lrow"><span class="mono" style="font-size:12.5px">${esc(r.started ? fmt(r.started, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')}</span><span style="flex:1">${esc(r.agent)}${r.note ? ` <span class="muted">${esc(r.note)}</span>` : ''}</span><span style="color:${r.status === 'ok' ? 'var(--good)' : r.status === 'running' ? 'var(--warn)' : 'var(--bad)'}">${esc(r.status)}</span></div>`).join('') || '<div class="empty">No runs logged yet. Logging starts with the next compiler version.</div>'}</section>
+        <section class="card"><div class="chead"><h2 class="h sm">Possible duplicate people</h2><span class="sub">${t.possible_duplicates.length}</span></div>${t.possible_duplicates.map(d => `<div class="lrow">${esc(d.a_name)} <span class="muted">and</span> ${esc(d.b_name)}</div>`).join('') || '<div class="empty">None found.</div>'}</section>
+        <section class="card"><div class="chead"><h2 class="h sm">Your corrections</h2></div>${t.corrections.map(c => `<div class="lrow" style="display:block"><b style="font-weight:500">${esc(c.title)}</b> <span class="muted">${esc(shortDate(c.at))} · ${esc(c.status)}</span>${c.changed.length ? `<div class="muted" style="font-size:12.5px">${c.changed.map(esc).join('; ')}</div>` : ''}</div>`).join('') || '<div class="empty">No corrections yet.</div>'}</section>
+      </div></div></div>`;
+}
+
+
+// ── Diary ──────────────────────────────────────────────────────────────────────────────────────────
+// Written each night from what he said that day (check-ins, calls, Bee). His edit wins: the nightly run then leaves that day alone.
+function monthShift(m, n) { const d = new Date((m ?? ymd(new Date()).slice(0, 7)) + '-01T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); }
+function renderDiary() {
+  const d = S.diary; if (!d) return S.err.diary ? notice(S.err.diary) : loading();
+  const m = d.month; const first = new Date(m + '-01T12:00:00Z'); const lead = (first.getUTCDay() + 6) % 7;
+  const nDays = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
+  const has = new Map(d.days.map(x => [x.day, x])); const wait = new Set(d.waiting.map(w => w.day));
+  const cells = ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<div class="dow">${x}</div>`).join('') + '<div></div>'.repeat(lead) +
+    Array.from({ length: nDays }, (_, i) => { const day = `${m}-${String(i + 1).padStart(2, '0')}`; const h = has.get(day);
+      return `<button type="button" class="dd ${h ? 'has' : ''} ${wait.has(day) ? 'wait' : ''} ${day === d.today ? 'today' : ''}" ${h ? `data-dday="${day}"` : 'tabindex="-1"'} title="${esc(dayName(day))}${h?.mood ? ' · ' + esc(h.mood) : ''}${wait.has(day) ? ' · new things said, entry comes with the next run' : ''}">${i + 1}</button>`; }).join('');
+  const waitTxt = d.waiting.length ? `${d.waiting.length} day${d.waiting.length === 1 ? '' : 's'} with new things you said: ${d.waiting.map(w => shortDate(w.day)).join(', ')}. The next compile run writes them (4 a run).` : 'Every day you talked to the brain has an entry.';
+  const entry = (e) => {
+    if (S.diaryEdit === e.day) return `<article class="card dentry dedit" id="d-${e.day}"><div class="dtop"><span class="dday">${esc(dayName(e.day))}</span><span class="sub">editing</span></div>
+      <textarea id="dEditBody" aria-label="Diary entry">${esc(e.body)}</textarea>
+      <div class="row"><input id="dEditMood" placeholder="How you felt, in your words (optional)" value="${esc(e.mood ?? '')}" aria-label="Mood"><span class="spacer" style="flex:1"></span>
+      <button class="btn" type="button" data-dcancel="1">Cancel</button><button class="btn primary" type="button" data-dsave="${e.day}">Save</button></div>
+      <div class="sub" style="margin-top:8px">Once you save, the nightly run leaves this day as you wrote it.</div></article>`;
+    const paras = String(e.body).split(/\n{2,}/).map(p => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`).join('');
+    const quotes = (e.quotes ?? []).map(q => `<div class="dquote">“${esc(q.text)}”</div>`).join('');
+    const links = [...(e.people ?? []).map(p => `<button type="button" class="chip" data-goperson="${esc(p.id)}">${esc(p.name)}</button>`),
+      ...(e.pursuits ?? []).map(p => `<span class="chip">${esc(p.title)}</span>`),
+      ...(e.boxes ?? []).map(b => `<span class="chip"><span class="swatch" style="background:${boxColor(boxKey(b.id))}"></span>${esc(String(b.title).split(':')[0])}</span>`)].join('');
+    return `<article class="card dentry" id="d-${e.day}"><div class="dtop"><span class="dday">${esc(dayName(e.day))}</span>${e.mood ? `<span class="mood">${esc(e.mood)}</span>` : ''}</div>
+      <div class="dbody">${paras}</div>${quotes}${links ? `<div class="dlinks">${links}</div>` : ''}
+      <div class="dfoot"><span>${e.edited ? 'Written by you' : `Written from ${e.sources} thing${e.sources === 1 ? '' : 's'} you said`}${wait.has(e.day) && !e.edited ? ' · more to add on the next run' : ''}</span><span class="spacer"></span><button class="btn" type="button" data-dedit="${e.day}">Edit</button></div></article>`;
+  };
+  const title = d.query ? `Search: “${esc(d.query)}”` : esc(new Date(m + '-01T12:00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }));
+  return `<div class="page">
+    <div class="dhead"><h1 class="h1">Diary</h1><span class="sub">Your days, in your words.</span><span class="spacer"></span>
+      <input id="dsearch" class="dsearch" type="search" placeholder="Search your diary" value="${esc(S.diaryQ)}" aria-label="Search your diary"></div>
+    <div class="row2">
+      <div class="rail" style="flex:0 1 300px">
+        <section class="card"><div class="chead"><button class="btn" type="button" data-dmonth="-1" aria-label="Previous month">‹</button><h2 class="h sm" style="flex:1;text-align:center">${title}</h2><button class="btn" type="button" data-dmonth="1" aria-label="Next month">›</button></div>
+          ${d.query ? `<button class="btn" type="button" data-dmonth="0">Back to this month</button>` : `<div class="dmonth">${cells}</div>`}</section>
+        <section class="card"><div class="chead"><h2 class="h sm">Coming next</h2></div><div class="sub" style="font-size:13px;line-height:1.5">${esc(waitTxt)}</div>
+          <div class="sub" style="font-size:13px;line-height:1.5;margin-top:8px">Only what you tell the brain gets in: check-ins, calls that end with a save, Bee recordings.</div></section>
+      </div>
+      <div class="grow" style="display:flex;flex-direction:column;gap:16px">
+        ${d.entries.map(entry).join('') || `<div class="card"><div class="empty">${d.query ? 'Nothing in your diary matches that.' : 'No entries this month yet. The next compile run writes one for each day you talked to the brain.'}</div></div>`}
+      </div></div></div>`;
+}
+async function saveDiary(day) {
+  const body = $('#dEditBody')?.value ?? ''; const mood = $('#dEditMood')?.value ?? '';
+  if (!body.trim()) { toast('The entry is empty. Write something or press Cancel.'); return; }
+  const e = S.diary?.entries.find(x => x.day === day); const before = e ? { ...e } : null;
+  if (e) { e.body = body.trim(); e.mood = mood.trim() || null; e.edited = true; } S.diaryEdit = null; render();
+  try { await act('edit_diary', { day, body, mood: mood.trim() || null }); toast('Saved. The nightly run will leave this day as you wrote it.'); }
+  catch (err) { if (e && before) Object.assign(e, before); S.diaryEdit = day; render(); needsUpdate('Editing the diary')(err); }
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-dmonth],[data-dday],[data-dedit],[data-dsave],[data-dcancel]'); if (!t) return;
+  if (t.dataset.dmonth != null) { const n = +t.dataset.dmonth; S.diaryQ = ''; S.diaryMonth = n === 0 ? null : monthShift(S.diary?.month, n); S.diary = null; render(); return load('diary'); }
+  if (t.dataset.dday) { const el = document.getElementById('d-' + t.dataset.dday); if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); return; }
+  if (t.dataset.dedit) { S.diaryEdit = t.dataset.dedit; render(); const ta = $('#dEditBody'); if (ta) ta.focus(); return; }
+  if (t.dataset.dcancel) { S.diaryEdit = null; return render(); }
+  if (t.dataset.dsave) return saveDiary(t.dataset.dsave);
+});
+document.addEventListener('keydown', (e) => { if (e.target.id === 'dsearch' && e.key === 'Enter') { S.diaryQ = e.target.value.trim(); S.diaryMonth = null; S.diary = null; render(); load('diary'); } });
+
+// ── Shell ──────────────────────────────────────────────────────────────────────────────────────────
+function loading() { return '<div class="page"><div class="empty">Loading…</div></div>'; }
+function notice(e) { return `<div class="notice"><b>This screen could not load</b>${esc(errText(e))}</div>`; }
+function status() {
+  const c = S.control; const el = $('#sync');
+  if (S.control) $('#dayLabel').textContent = dayName(S.control.mode.day) + (S.control.mode.rolled_to_tomorrow ? ' (tomorrow)' : '');
+  if (!c) { el.innerHTML = '<i class="dot warn"></i><span>Waiting for the brain</span>'; return; }
+  const h = c.health; const lc = h.last_compile; const age = lc ? (Date.now() - new Date(lc)) / 36e5 : null;
+  const dot = age == null ? 'warn' : age > 8 ? 'bad' : age > 6.5 ? 'warn' : '';
+  const when = age == null ? 'compile not logged' : age < 1 ? 'synced just now' : `synced ${Math.round(age)}h ago`;
+  el.innerHTML = `<i class="dot ${dot}"></i><span>${cap(when)}${h.waiting ? ` · ${h.waiting} waiting` : ''}</span>`;
+  el.title = `Auto mode: ${c.mode.mode}${c.mode.rolled_to_tomorrow ? ' (showing tomorrow)' : ''}. Updated ${S.updated ? tme(S.updated.toISOString()) : '–'}. Click for brain health.`;
+}
+function render() {
+  const s = screen();
+  document.querySelectorAll('nav.tabs a').forEach(a => a.setAttribute('aria-current', a.getAttribute('href') === '#' + s ? 'page' : 'false'));
+  const html = { today: renderToday, goals: renderGoals, work: renderWork, people: renderPeople, plan: renderPlan, diary: renderDiary, trust: renderTrust }[s]();
+  const m = $('#main'); const keep = m.scrollTop; const gTop = $('#gridwrap')?.scrollTop; const pcTop = $('.pcard')?.scrollTop;
+  const focusId = document.activeElement?.id; const caret = document.activeElement?.selectionStart;
+  m.innerHTML = html; m.scrollTop = keep;
+  if (s === 'plan') { const g = $('#gridwrap'); if (g && gTop != null) { g.scrollTop = gTop; g.dataset.scrolled = '1'; } else scrollPlan(); }
+  if (s === 'people') { mountSky(); const pc = $('.pcard'); if (pc && pcTop) pc.scrollTop = pcTop; }
+  if (focusId === 'psearch') { const i = $('#psearch'); if (i) { i.focus(); try { i.setSelectionRange(caret, caret); } catch { /* not a text input */ } } }
+  status();
+}
+
+// ── Actions ────────────────────────────────────────────────────────────────────────────────────────
+function allTaskCopies(id) { const out = []; const c = S.control;
+  [c?.tasks, c?.big3, S.person?.i_owe, S.week?.backlog].forEach(arr => (arr ?? []).forEach(t => { if (t.id === id) out.push(t); }));
+  (S.work ?? []).forEach(p => { if (p.next_move?.id === id) out.push(p.next_move); }); return out; }
+// mark_commitment: done / dropped / open, optimistic, with undo back to the previous status
+async function mark(id, to, isUndo = false) {
+  const copies = allTaskCopies(id); if (!copies.length && !isUndo) return;
+  const before = copies[0]?.status ?? 'open';
+  copies.forEach(t => { t.status = to; }); render();
+  try {
+    await act('mark_commitment', { commitment_id: id, status: to, source: 'desk', reason: isUndo ? 'undo on the desk' : to === 'done' ? 'ticked on the desk' : to === 'dropped' ? 'dropped on the desk' : 'reopened on the desk' });
+    if (isUndo) toast('Undone.');
+    else toast({ done: 'Done. Google Tasks updated too.', dropped: 'Dropped.', open: 'Reopened.' }[to] ?? 'Saved.', () => mark(id, before, true));
+    setTimeout(() => load(['today', 'plan', 'work'].includes(screen()) ? screen() : 'today', true), 1200);
+  } catch (e) { copies.forEach(t => { t.status = before; }); render(); toast(errText(e)); }
+}
+const tick = (id) => { const t = allTaskCopies(id)[0]; if (!t) return; mark(id, t.status === 'done' || t.status === 'dropped' ? 'open' : 'done'); };
+async function star(id) {
+  const c = S.control; if (!c) return;
+  let ids = c.big3.map(b => b.id);
+  if (ids.includes(id)) ids = ids.filter(x => x !== id); else { if (ids.length >= 3) { toast('Big 3 is full. Remove one first.'); return; } ids.push(id); }
+  try { await act('set_priorities', { date: c.mode.day, commitment_ids: ids, set_by: 'desk' }); await load('today', true); }
+  catch (e) { needsUpdate('Setting the Big 3')(e); }
+}
+async function setStage(id, stage) {
+  const p = S.work?.find(x => x.id === id); const before = p?.stage; if (p) { if (p.stage === stage) return; p.stage = stage; render(); }
+  try { await act('update_pursuit', { id, stage }); toast('Moved to ' + stage + '.', before ? () => setStage(id, before) : null); }
+  catch (e) { if (p) p.stage = before; needsUpdate('Changing stages')(e); }
+  load('work', true);
+}
+async function planAt(day, y, id = S.pick) {
+  const w = S.week; const c = w.backlog.find(x => x.id === id); if (!c) return;
+  const startMin = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / HOUR * 2) * 30));
+  const dur = c.estimate_min ?? 60;
+  S.pick = null;
+  try { await act('plan_block', { start: nyIso(day, startMin), end: nyIso(day, Math.min(24 * 60, startMin + dur)), commitment_id: c.id }); toast('Planned.'); }
+  catch (e) { needsUpdate('Planning')(e); }
+  load('plan', true);
+}
+function estPop(el) {
+  closePop(); const id = +el.dataset.est; const c = allTaskCopies(id)[0]; if (!c) return;
+  const p = document.createElement('div'); p.className = 'pop'; placePop(p, el, 170);
+  p.innerHTML = `<b>How long will it take?</b><div class="muted" style="font-size:12px">${esc(c.action)}</div>
+    <div class="row">${[5, 15, 30, 45, 60, 90, 120].map(m => `<button class="btn" type="button" data-setest="${m}">${fmtMin(m)}</button>`).join('')}</div>
+    <div class="row"><input id="estMin" type="number" min="5" max="600" step="5" value="${c.estimate_min ?? 30}" aria-label="Minutes"> <span class="muted" style="align-self:center">minutes</span><button class="btn primary" type="button" id="estSave">Save</button></div>`;
+  document.body.appendChild(p); p.querySelector('#estMin').focus();
+  const save = async (m) => { closePop(); if (!(m > 0)) return; allTaskCopies(id).forEach(t => { t.estimate_min = m; t.estimate_source = 'his'; }); render();
+    try { await act('update_task', { commitment_id: id, estimate_min: m }); toast('Estimate set to ' + fmtMin(m) + '.'); }
+    catch (e) { needsUpdate('Editing estimates')(e); }
+    load(screen() === 'people' ? 'today' : screen(), true); };
+  p.querySelectorAll('[data-setest]').forEach(b => b.onclick = () => save(+b.dataset.setest));
+  p.querySelector('#estSave').onclick = () => save(Math.round(+p.querySelector('#estMin').value));
+  p.querySelector('#estMin').onkeydown = (e) => { if (e.key === 'Enter') save(Math.round(+e.target.value)); };
+}
+function blockPop(el) {
+  closePop(); const id = +el.dataset.block; const b = S.week.blocks.find(x => x.id === id); if (!b) return;
+  const p = document.createElement('div'); p.className = 'pop'; placePop(p, el, 120);
+  p.innerHTML = `<b>${esc(b.title ?? 'Block')}</b><div class="muted mono" style="font-size:12px">${tme(b.start)}–${tme(b.end)}${b.in_calendar ? ' · in Google Calendar' : ''}</div><div class="row"><button class="btn" type="button" id="keepBlock">Keep</button><button class="btn danger" type="button" id="delBlock">Delete block</button></div>`;
+  document.body.appendChild(p);
+  $('#keepBlock').onclick = closePop;
+  $('#delBlock').onclick = async () => { closePop(); try { await act('delete_block', { id }); toast('Block deleted.'); } catch (e) { needsUpdate('Deleting blocks')(e); } load('plan', true); };
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target.closest('[data-est],[data-tick],[data-drop],[data-star],[data-org-of],[data-selp],[data-goperson],[data-orgf],[data-pick],[data-week],[data-month],[data-block],[data-copy],[data-bucket],[data-pf],[data-more],[data-zoom],[data-fly],.daycol');
+  if (!t) return;
+  if (t.dataset.est) return estPop(t);
+  if (t.dataset.tick) return tick(+t.dataset.tick);
+  if (t.dataset.drop) return mark(+t.dataset.drop, 'dropped');
+  if (t.dataset.star) return star(+t.dataset.star);
+  if (t.dataset.bucket) { S.ui.bucket = t.dataset.bucket; S.ui.showAll = false; return render(); }
+  if (t.dataset.pf != null) { S.ui.pursuit = t.dataset.pf || null; return render(); }
+  if (t.dataset.more != null) { S.ui.showAll = t.dataset.more === '1'; return render(); }
+  if (t.dataset.zoom) { return t.dataset.zoom === 'fit' ? skyFit(true) : skyZoomBy(t.dataset.zoom === 'in' ? 1.8 : 1 / 1.8); }
+  if (t.dataset.fly) return skyFlyKey(t.dataset.fly);
+  if (t.dataset.orgf != null) { S.ui.org = t.dataset.orgf || null; render(); if (S.ui.org) skyFlyKey('o:' + S.ui.org); else skyFit(true); return; }
+  if (t.dataset.selp) { if (t.dataset.flyp || !SKY.vis.some(n => n.id === t.dataset.selp)) flyToPerson(t.dataset.selp); return selectPerson(t.dataset.selp); }
+  if (t.dataset.goperson) { location.hash = '#people'; S.personId = t.dataset.goperson; setTimeout(() => flyToPerson(t.dataset.goperson), 400); return; }
+  if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast('Copied.'); } catch { const r = document.createRange(); r.selectNodeContents(t.previousElementSibling); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Selected. Press Ctrl+C to copy.'); } return; }
+  if (t.dataset.orgOf) { const p = S.work.find(x => x.id === t.dataset.orgOf); location.hash = '#people'; if (!S.net) await load('people', true);
+    const org = S.net?.orgs.find(o => p && o.name && p.title.toLowerCase().startsWith(o.name.toLowerCase().split(' ')[0])); S.ui.org = org?.id ?? null; render(); if (org) setTimeout(() => skyFlyKey('o:' + org.id), 300); return; }
+  if (t.dataset.pick) { S.pick = S.pick === +t.dataset.pick ? null : +t.dataset.pick; return render(); }
+  if (t.dataset.week != null) { const n = +t.dataset.week; if (n === 0) S.weekStart = null; else S.weekStart = addDays(S.week?.week_start ?? mondayOf(ymd(new Date())), 7 * n); S.week = null; render(); return load('plan'); }
+  if (t.dataset.month != null) { const n = +t.dataset.month; if (n === 0) S.reviewMonth = null; else { const base = (S.review?.month ?? ymd(new Date())).slice(0, 7) + '-01'; const d = new Date(base + 'T12:00:00Z'); d.setUTCMonth(d.getUTCMonth() + n); S.reviewMonth = d.toISOString().slice(0, 10); } S.review = null; render(); return load('goals'); }
+  if (t.dataset.block) return blockPop(t);
+  if (t.classList.contains('daycol') && S.pick) { const r = t.getBoundingClientRect(); return planAt(t.dataset.day, e.clientY - r.top); }
+});
+document.addEventListener('change', e => { const s = e.target.closest('[data-stage]'); if (s) setStage(s.dataset.stage, s.value); });
+document.addEventListener('input', e => { if (e.target.id === 'psearch') S.ui.q = e.target.value; });
+document.addEventListener('keydown', e => { if (e.target.id === 'psearch' && e.key === 'Enter' && S.net) { const q = S.ui.q.trim().toLowerCase(); const hit = q && S.net.nodes.find(n => n.name.toLowerCase().includes(q)); if (hit) { flyToPerson(hit.id); selectPerson(hit.id); } else toast('No one by that name.'); } });
+
+// Drag and drop: firms between stages, backlog tasks onto the week.
+document.addEventListener('dragstart', e => {
+  const f = e.target.closest?.('[data-firm]'); const b = e.target.closest?.('.bl[data-pick]');
+  if (f) { S.drag = { kind: 'firm', id: f.dataset.firm }; f.classList.add('dragging'); }
+  else if (b) S.drag = { kind: 'task', id: +b.dataset.pick };
+  else return;
+  e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(S.drag.id));
+});
+const endDrag = () => { S.drag = null; document.querySelectorAll('.dragging').forEach(x => x.classList.remove('dragging')); document.querySelectorAll('.col.over').forEach(x => x.classList.remove('over')); document.querySelectorAll('.ghost').forEach(x => x.remove()); document.querySelectorAll('.dropping').forEach(x => x.classList.remove('dropping')); };
+document.addEventListener('dragend', endDrag);
+document.addEventListener('dragover', e => {
+  if (!S.drag) return;
+  if (S.drag.kind === 'firm') { const col = e.target.closest('.col'); document.querySelectorAll('.col.over').forEach(x => x !== col && x.classList.remove('over')); if (col) { e.preventDefault(); col.classList.add('over'); } return; }
+  const dc = e.target.closest('.daycol'); if (!dc) return; e.preventDefault();
+  const c = S.week?.backlog.find(x => x.id === S.drag.id); const dur = c?.estimate_min ?? 60;
+  const y = e.clientY - dc.getBoundingClientRect().top; const sm = Math.max(0, Math.min(23 * 60 + 30, Math.floor(y / HOUR * 2) * 30));
+  let g = dc.querySelector('.ghost'); document.querySelectorAll('.ghost').forEach(x => x !== g && x.remove()); document.querySelectorAll('.dropping').forEach(x => x !== dc && x.classList.remove('dropping'));
+  if (!g) { g = document.createElement('div'); g.className = 'ghost'; dc.appendChild(g); dc.classList.add('dropping'); }
+  g.style.top = sm / 60 * HOUR + 'px'; g.style.height = Math.max(18, dur / 60 * HOUR - 3) + 'px';
+  g.textContent = `${String(Math.floor(sm / 60)).padStart(2, '0')}:${String(sm % 60).padStart(2, '0')} · ${fmtMin(dur)}`;
+});
+document.addEventListener('drop', e => {
+  if (!S.drag) return; const d = S.drag; endDrag();
+  if (d.kind === 'firm') { const col = e.target.closest('.col'); if (col) { e.preventDefault(); setStage(d.id, col.dataset.col); } return; }
+  const dc = e.target.closest('.daycol'); if (!dc) return; e.preventDefault();
+  planAt(dc.dataset.day, e.clientY - dc.getBoundingClientRect().top, d.id);
+});
+window.addEventListener('hashchange', () => { closePop(); render(); load(); });
+$('#refresh').onclick = () => { if (screen() === 'people') S.netAt = 0; load(); };
+
+// Every 60s: Today and Plan reload fully; other screens refresh only 'control'. Paused while dragging or hidden.
+setInterval(() => {
+  if (document.hidden || S.drag || SKY.drag) return;
+  const s = screen();
+  if (s === 'today' || s === 'plan') load(s, true);
+  else view('control').then(c => { S.control = c; S.updated = new Date(); status(); }).catch(() => {});
+}, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ['today', 'plan'].includes(screen())) load(screen(), true); });
+
+function setup(msg) {
+  $('#main').innerHTML = `<form class="notice" id="setupForm" style="display:grid;gap:10px">
+    <b>Connect this desk to your brain</b><span>${esc(msg)}</span>
+    <input id="tok" type="password" autocomplete="off" placeholder="Connector token, or the whole connector URL" style="padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:transparent">
+    <div><button class="btn primary" type="submit">Connect</button></div>
+    <span class="muted" style="font-size:12.5px">Kept only in this browser. It is the same token as the Second Brain connector (the part after the last / of its URL).</span></form>`;
+  $('#setupForm').onsubmit = async (e) => { e.preventDefault(); TOKEN = cleanToken($('#tok').value); store.set('brain_token', TOKEN); await start(); };
+}
+async function start() {
+  try { if (!MCP) await direct('GET', { view: 'health' }); }
+  catch (e) { if (e.code === 'bad_token' || e.code === 'no_token') return setup(e.code === 'bad_token' ? 'That token was not accepted. Paste it again.' : 'Paste the brain connector token once. After that the desk loads by itself and refreshes every minute.'); }
+  await load();
+  if (screen() !== 'today') load('today', true);
+}
+$('#tokenBtn').onclick = () => { store.set('brain_token', ''); TOKEN = ''; setup('Enter the brain connector token.'); };
+(async function boot() {
+  try { MCP = window.claude?.use ? await window.claude.use('mcp') : null; } catch { MCP = null; }
+  if (!MCP) $('#tokenBtn').hidden = false;
+  await start();
+})();
+</script>
+
+</body>
+</html>

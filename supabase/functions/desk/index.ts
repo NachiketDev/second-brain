@@ -1,8 +1,8 @@
 // DESK: read and act API for the standalone desk apps (v1 and v2) when they run outside Claude.
 // Auth: brain_mcp_secret, sent in the x-brain-token header or as the last path segment. Wrong token = 404.
 // v1: GET returns the brain_desk bundle; POST {action:'done'|'dropped'|'open', id} marks one of HIS commitments.
-// v2: GET ?view=control|goals|workbench|people|person|week|review|trust|health (+ org, id, week_start, month)
-//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (mark, set_priorities, update_pursuit, plan_block, delete_block, update_task) (all through brain_* functions).
+// v2: GET ?view=control|goals|workbench|people|person|week|review|trust|health|diary (+ org, id, week_start, month, q)
+//     returns that desk_* screen; POST {op, ...} runs one of a few fixed writes (mark, set_priorities, update_pursuit, plan_block, delete_block, update_task, edit_diary) (all through brain_* functions).
 // Nothing is ever sent to anyone from here; Google Tasks gets a copy of his own task changes.
 import { checkSecret, db } from '../_shared/lib.ts';
 import { gConfigured, pushGoogleTasks } from '../_shared/gtasks.ts';
@@ -20,6 +20,7 @@ const VIEWS: Record<string, (q: URLSearchParams) => [string, Record<string, unkn
   review:    (q) => ['desk_review', { p_month: q.get('month') || null }],
   trust:     () => ['desk_trust', {}],
   health:    () => ['desk_health', {}],
+  diary:     (q) => ['desk_diary', { p_month: q.get('month') || null, p_q: q.get('q') || null }],
 };
 
 async function rpc(fn: string, params: Record<string, unknown>) {
@@ -49,6 +50,10 @@ const OPS: Record<string, (b: any) => Promise<unknown>> = {
   plan_block: (b) => rpc('brain_plan_block', { p_starts: b.start, p_ends: b.end, p_commitment_id: b.commitment_id ?? null,
     p_pursuit_id: b.pursuit_id ?? null, p_goal_id: b.goal_id ?? null, p_title: b.title ?? null, p_kind: b.kind ?? 'planned' }),
   delete_block: (b) => rpc('brain_delete_block', { p_id: Number(b.id) }),
+  edit_diary: (b) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.day ?? '')) || !String(b.body ?? '').trim()) throw new Error('bad request');
+    return rpc('brain_edit_diary', { p_day: b.day, p_body: String(b.body), p_mood: b.mood ?? null });
+  },
   update_task: async (b) => {
     const f: Record<string, unknown> = {};
     for (const [k, col] of [['pursuit_id', 'pursuit_id'], ['goal_id', 'goal_id'], ['due_date', 'due_at'], ['estimate_min', 'estimate_min'], ['title', 'action']])
